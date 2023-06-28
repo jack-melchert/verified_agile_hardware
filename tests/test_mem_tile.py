@@ -7,5 +7,6 @@ def test_mem_tile_btor_file():
     solver = Solver()
     solver.read_btor2("examples/mem_core.btor2")
 
+
 def test_mem_tile_yosys():
     mem_tile_to_btor()

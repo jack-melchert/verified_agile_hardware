@@ -5,6 +5,7 @@ apt install build-essential clang bison flex \
 
 dir=$pwd
 sdir=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+mkdir -p cd $sdir/../deps
 cd $sdir/../deps
 
 git clone https://github.com/YosysHQ/yosys.git

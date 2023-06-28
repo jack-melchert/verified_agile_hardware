@@ -1,35 +1,47 @@
 import subprocess
 import os
 
-def run_yosys_script(script, yosys_path='yosys'):
+
+def run_yosys_script(script, yosys_path="yosys"):
     """Run a Yosys script and return the output."""
     # Check if yosys is installed
     try:
-        subprocess.run([yosys_path, '-h'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            [yosys_path, "-h"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
     except FileNotFoundError:
-        raise FileNotFoundError('Could not find yosys. Please install yosys using scripts/setup_yosys.sh.')
+        raise FileNotFoundError(
+            "Could not find yosys. Please install yosys using scripts/setup_yosys.sh."
+        )
 
-    cmd = [yosys_path, '-ql', '/dev/stdout', '-s', '/dev/stdin']
+    cmd = [yosys_path, "-ql", "/dev/stdout", "-s", "/dev/stdin"]
 
     print("Running Yosys script...")
-    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate(script.encode('utf-8'))
+    p = subprocess.Popen(
+        cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    stdout, stderr = p.communicate(script.encode("utf-8"))
 
     # Make sure output has no errors
-    if 'ERROR' in stdout.decode('utf-8'):
-        raise RuntimeError(stdout.decode('utf-8'))
-    if 'ERROR' in stderr.decode('utf-8'):
-        raise RuntimeError(stderr.decode('utf-8'))
-    
+    if "ERROR" in stdout.decode("utf-8"):
+        raise RuntimeError(stdout.decode("utf-8"))
+    if "ERROR" in stderr.decode("utf-8"):
+        raise RuntimeError(stderr.decode("utf-8"))
+
     print("Finished running Yosys script.")
 
-def sv2v(sv_filename, sv2v_path='sv2v'):
+
+def sv2v(sv_filename, sv2v_path="sv2v"):
     """Convert a SystemVerilog file to Verilog using sv2v."""
     # Check if sv2v is installed
     try:
-        subprocess.run([sv2v_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            [sv2v_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
     except FileNotFoundError:
-        raise FileNotFoundError('Could not find sv2v. Please install sv2v using scripts/setup_sv2v.sh.')
+        raise FileNotFoundError(
+            "Could not find sv2v. Please install sv2v using scripts/setup_sv2v.sh."
+        )
 
     cmd = [sv2v_path, sv_filename]
 
@@ -38,32 +50,37 @@ def sv2v(sv_filename, sv2v_path='sv2v'):
     stdout, stderr = p.communicate()
 
     # create filename in directory of this file
-    filename = os.path.join(os.path.dirname(__file__), '../examples/sv2v_output.v')
+    filename = os.path.join(os.path.dirname(__file__), "../examples/sv2v_output.v")
     print("Done running sv2v on " + sv_filename + ".")
     print("Writing output to " + filename + "...")
-    with open(filename, 'w') as f:
-        f.write(stdout.decode('utf-8'))
+    with open(filename, "w") as f:
+        f.write(stdout.decode("utf-8"))
 
     return filename
 
-def mem_tile_to_btor(garnet_filename="/aha/garnet/garnet.v", mem_tile_module="MemCore_inner", btor_filename="mem_core.btor2"):
+
+def mem_tile_to_btor(
+    garnet_filename="/aha/garnet/garnet.v",
+    mem_tile_module="MemCore_inner",
+    btor_filename="mem_core.btor2",
+):
     """Convert a memory tile to a BTOR2 file."""
 
     # Check if garnet_filename exists
     try:
-        with open(garnet_filename, 'r') as f:
+        with open(garnet_filename, "r") as f:
             pass
     except FileNotFoundError:
-        raise FileNotFoundError(f'Could not find {garnet_filename}')
-    
+        raise FileNotFoundError(f"Could not find {garnet_filename}")
+
     sv_filename = sv2v(garnet_filename)
 
     # Check if sv_filename exists
     try:
-        with open(sv_filename, 'r') as f:
+        with open(sv_filename, "r") as f:
             pass
     except FileNotFoundError:
-        raise FileNotFoundError(f'Could not find {sv_filename}, sv2v failed.')
+        raise FileNotFoundError(f"Could not find {sv_filename}, sv2v failed.")
 
     script = f"""
 # read in the file(s) -- there can be multiple
@@ -120,4 +137,3 @@ write_btor {btor_filename}
 
     run_yosys_script(script)
     print(f"Finished writing BTOR2 file to {btor_filename}")
-
