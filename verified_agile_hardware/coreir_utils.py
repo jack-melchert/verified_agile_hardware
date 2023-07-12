@@ -16,6 +16,35 @@ def coreir_to_pdf(nx_graph, filename):
     dot.render(filename)
 
 
+def nx_to_smt(graph):
+    for node, data in graph.nodes(data=True):
+        if "inst" not in data:
+            assert (
+                node == "in" or node == "out"
+            ), "Only in and out nodes should not have an inst attribute"
+        else:
+            tile_type = data["inst"].module.ref_name
+
+            if tile_type == "global.IO":
+                pass
+            elif tile_type == "global.BitIO":
+                pass
+            elif tile_type == "global.PE":
+                pass
+            elif tile_type == "cgralib.Mem":
+                pass
+            elif tile_type == "cgralib.Pond":
+                pass
+            elif tile_type == "coreir.reg":
+                pass
+            elif tile_type == "corebit.const":
+                pass
+            elif tile_type == "coreir.const":
+                pass
+            else:
+                raise NotImplementedError(f"Tile type {tile_type} not supported")
+
+
 def coreir_to_nx(cmod):
     """
     Convert a CoreIR module to a NetworkX graph.
@@ -35,6 +64,8 @@ def coreir_to_nx(cmod):
             source = conn.first.selectpath
             sink = conn.second.selectpath
 
+        if source[0] == "self":
+            source[0] = "in"
         if sink[0] == "self":
             sink[0] = "out"
 
@@ -55,6 +86,5 @@ def read_coreir(coreir_filename, top_module=None):
     c.load_library("commonlib")
     c.load_library("cgralib")
     cmod = c.load_from_file(coreir_filename)
-    kernels = dict(c.global_namespace.modules)
 
     return cmod.definition

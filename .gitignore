@@ -4,6 +4,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+examples/coreir_output
+examples/*.pdf
+
 # C extensions
 *.so
 
