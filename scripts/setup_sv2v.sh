@@ -1,3 +1,4 @@
+pwd
 dir=$pwd
 sdir=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 mkdir -p $sdir/../deps
