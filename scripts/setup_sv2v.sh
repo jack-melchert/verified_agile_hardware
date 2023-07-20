@@ -14,6 +14,7 @@ if grep -q docker /proc/1/cgroup; then
 else
     stack install 
 fi
-echo $dir
-ls -al
+
 cd $dir
+pwd
+ls -al
