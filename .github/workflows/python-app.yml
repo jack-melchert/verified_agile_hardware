@@ -28,7 +28,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        source scripts_setup_sv2v.sh
+        source scripts/setup_sv2v.sh
         source scripts/setup_yosys.sh
     - name: Test with pytest
       run: |
