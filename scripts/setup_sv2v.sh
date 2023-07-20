@@ -1,5 +1,5 @@
 pwd
-dir=$pwd
+dirpwd=$pwd
 sdir=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 mkdir -p $sdir/../deps
 cd $sdir/../deps
@@ -16,6 +16,6 @@ else
     stack install 
 fi
 
-cd $dir
+cd $dirpwd
 pwd
 ls -al
