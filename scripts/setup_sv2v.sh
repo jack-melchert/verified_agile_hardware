@@ -9,5 +9,9 @@ fi
 git clone https://github.com/zachjs/sv2v.git
 cd sv2v
 make
-stack install --local-bin-path /bin/
+if grep -q docker /proc/1/cgroup; then 
+    stack install --local-bin-path /bin/
+else
+    stack install 
+fi
 cd $dir
