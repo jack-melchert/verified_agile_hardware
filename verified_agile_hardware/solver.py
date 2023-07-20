@@ -5,7 +5,7 @@ import pono
 
 class Solver:
     def __init__(self):
-        self.fe_solver = fe.Solver("cvc5")
+        self.fe_solver = fe.Solver("btor")
         self.solver = self.fe_solver.solver
         self.converter = self.fe_solver.converter.convert
         self.fts = pono.FunctionalTransitionSystem(self.solver)
@@ -18,6 +18,12 @@ class Solver:
 
     def create_sort(self, kind, *args):
         return self.solver.make_sort(kind, *args)
+
+    def create_fts_input_var(self, name, sort):
+        return self.fts.make_inputvar(name, sort)
+
+    def create_fts_state_var(self, name, sort):
+        return self.fts.make_statevar(name, sort)
 
     def create_symbol(self, name, sort):
         return self.solver.make_symbol(name, sort)
@@ -47,3 +53,62 @@ class Solver:
     def node_to_smt(self, node, inputs):
         assert node in self.module_smt, f"Node {node} doesn't have a SMT representation"
         # Create a term for the node and assign inputs
+
+
+class Rewriter(ss.TermDagVisitor):
+    def __init__(self, solver, terms, suffix=""):
+        self._solver = solver
+        self.rewritten_terms = {}
+        self.suffix = suffix
+        self.state_vars = []
+        self.new_state_vars = []
+        self.terms = terms
+
+    def rewrite(self):
+        for term in self.terms:
+            self.walk_dag(term)
+
+        for term in self.state_vars:
+            new_term = self.rewritten_terms[str(term)]
+            old_state_target = self._solver.fts.state_updates[term]
+            new_state_target = self.rewritten_terms[str(old_state_target)]
+            self._solver.fts.assign_next(new_term, new_state_target)
+            self.new_state_vars.append(new_term)
+
+    def visit_term(self, term, new_children):
+        try:
+            return self.rewritten_terms[str(term)]
+        except KeyError:
+            pass
+
+        op = term.get_op()
+
+        if op:
+            new_term = self._solver.solver.make_term(op, new_children)
+            try:
+                name = self._solver.fts.get_name(term)
+                self._solver.fts.name_term(name + self.suffix, new_term)
+            except:
+                pass
+
+        elif term.is_symbolic_const():
+            name = str(term)
+
+            if self.suffix not in str(term):
+                name += self.suffix
+
+            sort = term.get_sort()
+
+            if self._solver.fts.is_input_var(term):
+                new_term = self._solver.create_fts_input_var(name, sort)
+            elif self._solver.fts.is_curr_var(term):
+                new_term = self._solver.create_fts_state_var(name, sort)
+                self.state_vars.append(term)
+            else:
+                new_term = self._solver.create_symbol(name, sort)
+
+        else:
+            new_term = term
+
+        self.rewritten_terms[str(term)] = new_term
+        return new_term
