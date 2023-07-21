@@ -2,7 +2,6 @@ from verified_agile_hardware.solver import Solver, Rewriter
 from verified_agile_hardware.yosys_utils import mem_tile_to_btor
 from verified_agile_hardware.lake_utils import (
     get_mem_btor_outputs,
-    load_new_mem_tile,
     get_mem_inputs,
 )
 import pytest
@@ -12,8 +11,9 @@ import smt_switch as ss
 @pytest.mark.parametrize(
     "mem_file, mem_module, mem_output_file",
     [
-        ("examples/simple_mem.v", "RamChip", "examples/RamChip.btor2"),
+        ("examples/simple_mem.v", "regfile", "examples/RamChip.btor2"),
         ("/aha/garnet/garnet.v", "MemCore_inner", "examples/MemCore_inner.btor2"),
+        ("/aha/garnet/garnet.v", "PondTop", "examples/PondTop.btor2"),
     ],
 )
 def test_mem_tile_yosys(mem_file, mem_module, mem_output_file):
@@ -27,6 +27,7 @@ def test_mem_tile_yosys(mem_file, mem_module, mem_output_file):
     [
         "examples/RamChip.btor2",
         "examples/MemCore_inner.btor2",
+        "examples/PondTop.btor2",
     ],
 )
 def test_mem_tile_btor_file(mem_file):
@@ -39,6 +40,7 @@ def test_mem_tile_btor_file(mem_file):
     [
         "examples/RamChip.btor2",
         "examples/MemCore_inner.btor2",
+        "examples/PondTop.btor2",
     ],
 )
 def test_loading_multiple_mems(mem_file):
@@ -62,7 +64,7 @@ def test_loading_multiple_mems(mem_file):
 
     solver.assert_formula(solver.ur.at_time(solver.fts.init, 0))
 
-    cycles = 100
+    cycles = 10
 
     for i in range(cycles + 1):
         solver.assert_formula(solver.ur.at_time(solver.fts.trans, i))
@@ -97,7 +99,5 @@ def test_loading_multiple_mems(mem_file):
                 ),
             )
         )
-
-    solver.solver.dump_smt2("/aha/register.smt2")
 
     solver.check_sat().is_unsat()

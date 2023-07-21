@@ -1,19 +1,19 @@
-module RamChip (Address, Data, CS, WE, OE);
+module regfile
+  (input clk,
+   input write,
+   input [2:0] wrAddr,
+   input [15:0] wrData,
+   input [2:0] rdAddrA,
+   output [15:0] rdDataA,
+   input [2:0] rdAddrB,
+   output [15:0] rdDataB);
 
-    parameter AddressSize = 1;
-    parameter WordSize = 1;
+   reg [15:0] 	 regfile [0:7];
 
-    input [AddressSize-1:0] Address;
-    inout [WordSize-1:0] Data;
-    input CS, WE, OE;
+   assign rdDataA = regfile[rdAddrA];
+   assign rdDataB = regfile[rdAddrB];
 
-    reg [WordSize-1:0] Mem [0:(1<<AddressSize)-1];
-
-    assign Data = (!CS && !OE) ? Mem[Address] : {WordSize{1'bz}};
-
-    always @(CS or WE)
-    if (!CS && !WE)
-        Mem[Address] = Data;
-
+   always @(posedge clk) begin
+      if (write) regfile[wrAddr] <= wrData;
+   end
 endmodule
-

@@ -164,8 +164,8 @@ def test_rewriter():
     solver.fts.name_term("x_plus_y", x_plus_y)
     solver.fts.assign_next(xy, x_plus_y)
 
-    Rewriter(solver, [xy], "_rewrite0").rewrite()
-    Rewriter(solver, [xy], "_rewrite1").rewrite()
+    Rewriter(solver, [xy, x_plus_y], "_rewrite0").rewrite()
+    Rewriter(solver, [xy, x_plus_y], "_rewrite1").rewrite()
 
     # If x_rewrite0 = x_rewrite1 and y_rewrite0 = y_rewrite1, then xy_rewrite0 = xy_rewrite1
     xy_rewrite0 = solver.fts.lookup("xy_rewrite0")
@@ -203,7 +203,5 @@ def test_rewriter():
             ),
         )
     )
-
-    solver.solver.dump_smt2("/aha/test_rewriter.smt2")
 
     assert solver.check_sat().is_unsat()

@@ -1,6 +1,7 @@
 import coreir
 import networkx as nx
 from verified_agile_hardware.solver import Solver, Rewriter
+from lassen import PE_fc, Inst_fc
 
 
 def coreir_to_pdf(nx_graph, filename):
