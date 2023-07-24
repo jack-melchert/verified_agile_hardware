@@ -12,9 +12,13 @@ class Solver:
         self.ur = pono.Unroller(self.fts)
         self.ops = ss.primops
         self.module_smt = {}
+        self.bboxes = {}
 
     def create_bvsort(self, width):
         return self.solver.make_sort(ss.sortkinds.BV, width)
+
+    def create_boolsort(self):
+        return self.solver.make_sort(ss.sortkinds.BOOL)
 
     def create_sort(self, kind, *args):
         return self.solver.make_sort(kind, *args)
@@ -42,17 +46,6 @@ class Solver:
 
     def check_sat(self):
         return self.solver.check_sat()
-
-    def create_node_smt(self, node):
-        if node not in self.module_smt:
-            self.module_smt[node] = self.solver.make_symbol(
-                node, self.create_bvsort(32)
-            )
-        return self.module_smt[node]
-
-    def node_to_smt(self, node, inputs):
-        assert node in self.module_smt, f"Node {node} doesn't have a SMT representation"
-        # Create a term for the node and assign inputs
 
 
 class Rewriter(ss.TermDagVisitor):

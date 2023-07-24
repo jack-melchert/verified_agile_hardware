@@ -1,7 +1,17 @@
 import coreir
 import networkx as nx
+import smt_switch as ss
 from verified_agile_hardware.solver import Solver, Rewriter
 from lassen import PE_fc, Inst_fc
+from peak import family
+import hwtypes
+from verified_agile_hardware.peak_utils import (
+    create_input,
+    load_pe_tile,
+    get_aadt,
+    get_pe_inputs,
+    get_pe_state,
+)
 
 
 def coreir_to_pdf(nx_graph, filename):
@@ -26,7 +36,50 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                     solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
                 )
     elif tile_type == "global.PE":
-        pass
+        # for each output symbol, convert only formula associated with that symbol, not the whole PE
+
+        out_port_names = [
+            str(out_symbol).split(f"{data['inst'].name}.")[1]
+            for out_symbol in out_symbols
+        ]
+        pe0, bboxes0 = load_pe_tile(
+            solver, PE_fc, pe_name=data["inst"].name, out_port_names=out_port_names
+        )
+        solver.bboxes.update(bboxes0)
+        pe_inputs = get_pe_inputs(solver, data["inst"].name)
+        pe_inputs = {str(i): i for i in pe_inputs}
+
+        for in_symbol in in_symbols:
+            port = str(in_symbol).split(f"{data['inst'].name}.")[1]
+            solver.assert_formula(
+                solver.create_term(
+                    solver.ops.Equal,
+                    in_symbol,
+                    pe_inputs[f"{port}_{data['inst'].name}"],
+                )
+            )
+
+        # This is hardcoded and will break if there are complex PE output types
+        out_to_slice = {}
+        curr_bit = 0
+        for idx, (n, v) in enumerate(PE_fc.SMT.output_t._field_table_.items()):
+            if issubclass(v, hwtypes.bit_vector.Bit):
+                size = 1
+            else:
+                size = v.size
+            out_to_slice[f"O{idx}"] = (curr_bit, curr_bit + size - 1)
+            curr_bit += size
+
+        for out_symbol in out_symbols:
+            port = str(out_symbol).split(f"{data['inst'].name}.")[1]
+            start, end = out_to_slice[port]
+
+            ext = ss.Op(ss.primops.Extract, end, start)
+            ext_pe = solver.create_term(ext, pe0)
+
+            solver.assert_formula(
+                solver.create_term(solver.ops.Equal, out_symbol, ext_pe)
+            )
     elif tile_type == "cgralib.Mem":
         pass
     elif tile_type == "cgralib.Pond":
@@ -46,13 +99,15 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
             solver.assert_formula(
                 solver.create_term(solver.ops.Equal, out_symbol, reg_val)
             )
-    elif tile_type == "corebit.const" or tile_type == "coreir.const":
+    elif tile_type == "corebit.const":
         value = data["inst"].config["value"].value
-        # Value to int
-        if type(value) == bool:
-            value = int(value)
-        else:
-            value = value.value
+        const = solver.solver.make_term(value)
+        solver.assert_formula(
+            solver.create_term(solver.ops.Equal, out_symbols[0], const)
+        )
+    elif tile_type == "coreir.const":
+        value = data["inst"].config["value"].value
+        value = value.value
         const = solver.create_const(value, out_symbols[0].get_sort())
         solver.assert_formula(
             solver.create_term(solver.ops.Equal, out_symbols[0], const)
@@ -79,9 +134,14 @@ def nx_to_smt(graph):
                 edge_info = graph.edges[in_]
                 name = f"{in_[1]}.{graph.edges[in_]['sink_port']}"
                 if name not in symbols:
-                    symbols[name] = solver.create_symbol(
-                        name, solver.create_bvsort(edge_info["bitwidth"])
-                    )
+                    if edge_info["bitwidth"] == 1:
+                        symbols[name] = solver.create_symbol(
+                            name, solver.create_boolsort()
+                        )
+                    else:
+                        symbols[name] = solver.create_symbol(
+                            name, solver.create_bvsort(edge_info["bitwidth"])
+                        )
                 in_symbols.append(symbols[name])
 
             out_symbols = []
@@ -89,9 +149,14 @@ def nx_to_smt(graph):
                 edge_info = graph.edges[out_]
                 name = f"{out_[0]}.{graph.edges[out_]['source_port']}"
                 if name not in symbols:
-                    symbols[name] = solver.create_symbol(
-                        name, solver.create_bvsort(edge_info["bitwidth"])
-                    )
+                    if edge_info["bitwidth"] == 1:
+                        symbols[name] = solver.create_symbol(
+                            name, solver.create_boolsort()
+                        )
+                    else:
+                        symbols[name] = solver.create_symbol(
+                            name, solver.create_bvsort(edge_info["bitwidth"])
+                        )
                 out_symbols.append(symbols[name])
 
             node_to_smt(solver, tile_type, in_symbols, out_symbols, data)

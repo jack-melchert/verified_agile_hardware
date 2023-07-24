@@ -72,7 +72,7 @@ def get_pe_state(solver, pe_name):
     return state_vars
 
 
-def load_pe_tile(solver, PE_fc, pe_name=""):
+def load_pe_tile(solver, PE_fc, pe_name="", out_port_names=()):
     PE_smt = PE_fc(family.SMTFamily())
 
     pe = PE_smt()
@@ -164,6 +164,9 @@ def load_pe_tile(solver, PE_fc, pe_name=""):
         reg_next = solver.convert(reg_next.value)
         reg_next = solver.solver.substitute(reg_next, mapping)
         solver.fts.assign_next(mapping[reg], reg_next)
+
+    # for port, out in outputs:
+    #     outputs[port] = solver.solver.substitute(out, mapping)
 
     o = solver.solver.substitute(o, mapping)
 
