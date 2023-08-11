@@ -1,6 +1,7 @@
 import smt_switch as ss
 import smt_switch.pysmt_frontend as fe
 import pono
+import os
 
 
 class Solver:
@@ -13,6 +14,11 @@ class Solver:
         self.ops = ss.primops
         self.module_smt = {}
         self.bboxes = {}
+        self.mem_tile_vars = None
+        self.file_info = {}
+        self.rsts = []
+        self.clks = []
+        self.flushes = []
 
     def create_bvsort(self, width):
         return self.solver.make_sort(ss.sortkinds.BV, width)
@@ -42,6 +48,8 @@ class Solver:
         self.solver.assert_formula(formula)
 
     def read_btor2(self, filename):
+        if not os.path.isfile(filename):
+            raise FileNotFoundError("File does not exist: {}".format(filename))
         pono.BTOR2Encoder(filename, self.fts)
 
     def check_sat(self):

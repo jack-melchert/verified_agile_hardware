@@ -61,7 +61,7 @@ def sv2v(sv_filename, sv2v_path="sv2v"):
 
 def mem_tile_to_btor(
     garnet_filename="/aha/garnet/garnet.v",
-    mem_tile_module="MemCore_inner",
+    mem_tile_module="strg_ub_vec_flat",
     btor_filename="mem_core.btor2",
 ):
     """Convert a memory tile to a BTOR2 file."""
