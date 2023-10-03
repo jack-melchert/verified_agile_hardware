@@ -9,7 +9,6 @@ from verified_agile_hardware.peak_utils import (
     get_pe_state,
 )
 from lassen import PE_fc as lassen_fc
-from examples.sum_pe.sim import PE_fc as PE_fc_s
 import smt_switch as ss
 
 
