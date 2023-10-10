@@ -1,16 +1,5 @@
-from lake.modules.strg_ub_vec import StrgUBVec
-from lake.modules.strg_RAM import StrgRAM
-from lake.modules.stencil_valid import StencilValid
-from lake.top.fiber_access import FiberAccess
-from lake.top.tech_maps import GF_Tech_Map
-
-# from garnet.memory_core.core_combiner_core import CoreCombinerCore
 from verified_agile_hardware.solver import Solver, Rewriter
 from verified_agile_hardware.yosys_utils import mem_tile_to_btor
-from canal.util import IOSide, SwitchBoxType
-from canal.global_signal import GlobalSignalWiring
-from lassen.sim import PE_fc as lassen_fc
-import smt_switch as ss
 import os
 
 

@@ -131,6 +131,9 @@ clk2fflogic;
 # inputs
 setundef -undriven -expose;
 
+
+#write_rtlil
+
 # This writes to a file in BTOR2 format
 write_btor {btor_filename}            
     """
