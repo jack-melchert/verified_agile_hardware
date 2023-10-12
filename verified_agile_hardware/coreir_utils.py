@@ -1,3 +1,4 @@
+import os
 import coreir
 import networkx as nx
 import json
@@ -99,12 +100,23 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
             )
     elif tile_type == "cgralib.Mem":
         mem_name = data["inst"].name
+
+        # Need to configure memory here
+        mem_tile = solver.interconnect.tile_circuits[(3, 1)]
+        config = mem_tile.core.get_config_bitstream(data["inst"].metadata)
+
+        # About to do something dumb
+        # sort config by the first number of the tuple
+        config = sorted(config, key=lambda x: x[0])
+        registers = solver.interconnect.tile_circuits[(3, 1)].core.registers
+        # Sort config inputs by the key
+        config_inputs = {
+            n.split(f"_{mem_name}")[0]: v for n, v in registers.items() if "CONFIG" in n
+        }
+        config_inputs = sorted(config_inputs.items(), key=lambda x: x[0])
+
         mem, mem_inputs, mem_outputs = load_new_mem_tile(
-            solver,
-            solver.file_info["memtile_verilog"],
-            solver.file_info["memtile_module_name"],
-            solver.file_info["memtile_btor"],
-            f"_{mem_name}",
+            solver, mem_name, mem_tile, data["inst"].metadata
         )
 
         used_mem_inputs = []
@@ -142,22 +154,6 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
             )
         )
         used_mem_inputs.append(mem_inputs[f"mode_excl_{mem_name}"])
-
-        # Need to configure memory here
-        mem_tile = solver.interconnect.tile_circuits[(3, 1)]
-        config = mem_tile.core.get_config_bitstream(data["inst"].metadata)
-
-        # About to do something dumb
-        # sort config by the first number of the tuple
-        config = sorted(config, key=lambda x: x[0])
-
-        # Sort config inputs by the key
-        config_inputs = {
-            n.split(f"_{mem_name}")[0]: v
-            for n, v in mem_inputs.items()
-            if "CONFIG" in n
-        }
-        config_inputs = sorted(config_inputs.items(), key=lambda x: x[0])
 
         for (idx, val), (name, sym) in zip(config, config_inputs):
             solver.assert_formula(
@@ -273,9 +269,13 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         raise NotImplementedError(f"Tile type {tile_type} not supported")
 
 
-def nx_to_smt(graph, interconnect, file_info=None):
+def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
     solver = Solver()
     solver.file_info = file_info
+    solver.app_dir = f"{app_dir}/verification"
+
+    if not os.path.exists(solver.app_dir):
+        os.mkdir(solver.app_dir)
 
     solver.interconnect = interconnect
 

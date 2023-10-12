@@ -1,6 +1,10 @@
 from verified_agile_hardware.solver import Solver, Rewriter
 from verified_agile_hardware.yosys_utils import mem_tile_to_btor
+from verified_agile_hardware.configure_mem_tile import MemtileConfig
 import os
+import magma
+import kratos as kts
+import json
 
 
 def get_mem_btor_outputs(solver, btor_filename, mem_name=""):
@@ -30,14 +34,42 @@ def get_mem_inputs(solver, mem_name):
     return input_dict
 
 
-def load_new_mem_tile(solver, mem_file, mem_module, btor_file, mem_name):
-    if not os.path.isfile(btor_file):
-        mem_tile_to_btor(mem_file, mem_tile_module=mem_module, btor_filename=btor_file)
+def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):
+    # Write configs to file
+    config_file = f"{solver.app_dir}/{mem_name}_config.json"
+    write_config = configs["config"]
+    write_config["mode"] = "UB"
+
+    with open(config_file, "w") as f:
+        json.dump(write_config, f, indent=4)
+
+    kts.Generator.clear_context_hash()
+    mem_tile.core.CC.wrapper(
+        wrapper_vlog_filename=f"{solver.app_dir}/{mem_name}_configed.sv",
+        wrapper_vlog_modulename=f"{mem_name}_config",
+        config_path=config_file,
+        externally_define=False,
+    )
+
+
+def load_new_mem_tile(solver, mem_name, mem_tile, configs):
+    # Write kratos configs to configure mem tile
+    produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name)
+
+    btor_file = f"{solver.app_dir}/{mem_name}_configed.btor"
+
+    mem_tile_to_btor(
+        f"{solver.app_dir}/{mem_name}_configed.sv",
+        mem_tile_module=f"{mem_name}_config",
+        btor_filename=btor_file,
+    )
 
     if not solver.mem_tile_vars:
         solver.read_btor2(btor_file)
         solver.mem_tile_vars = get_mem_btor_outputs(solver, btor_file)
         solver.mem_tile_vars.update(solver.fts.state_updates)
+
+    breakpoint()
 
     r0 = Rewriter(solver, solver.mem_tile_vars.values(), mem_name)
     r0.rewrite()

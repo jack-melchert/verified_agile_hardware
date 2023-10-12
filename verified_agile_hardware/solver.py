@@ -16,6 +16,7 @@ class Solver:
         self.bboxes = {}
         self.mem_tile_vars = None
         self.file_info = {}
+        self.app_dir = ""
         self.rsts = []
         self.clks = []
         self.flushes = []

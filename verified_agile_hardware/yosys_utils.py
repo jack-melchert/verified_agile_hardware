@@ -50,7 +50,7 @@ def sv2v(sv_filename, sv2v_path="sv2v"):
     stdout, stderr = p.communicate()
 
     # create filename in directory of this file
-    filename = os.path.join(os.path.dirname(__file__), "../examples/sv2v_output.v")
+    filename = sv_filename.replace(".sv", ".v")
     print("Done running sv2v on " + sv_filename + ".")
     print("Writing output to " + filename + "...")
     with open(filename, "w") as f:
