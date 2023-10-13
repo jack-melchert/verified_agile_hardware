@@ -61,6 +61,7 @@ def sv2v(sv_filename, sv2v_path="sv2v"):
 
 def mem_tile_to_btor(
     garnet_filename="/aha/garnet/garnet.v",
+    memtile_filename="/aha/garnet/garnet.v",
     mem_tile_module="strg_ub_vec_flat",
     btor_filename="mem_core.btor2",
 ):
@@ -73,20 +74,33 @@ def mem_tile_to_btor(
     except FileNotFoundError:
         raise FileNotFoundError(f"Could not find {garnet_filename}")
 
-    sv_filename = sv2v(garnet_filename)
+    try:
+        with open(memtile_filename, "r") as f:
+            pass
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Could not find {memtile_filename}")
+
+    sv_garnet_filename = sv2v(garnet_filename)
+    sv_memtile_filename = sv2v(memtile_filename)
 
     # Check if sv_filename exists
     try:
-        with open(sv_filename, "r") as f:
+        with open(sv_garnet_filename, "r") as f:
             pass
     except FileNotFoundError:
-        raise FileNotFoundError(f"Could not find {sv_filename}, sv2v failed.")
+        raise FileNotFoundError(f"Could not find {sv_garnet_filename}, sv2v failed.")
+
+    try:
+        with open(sv_memtile_filename, "r") as f:
+            pass
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Could not find {sv_memtile_filename}, sv2v failed.")
 
     script = f"""
 # read in the file(s) -- there can be multiple
 # whitespace separated files, and you can
 # escape new lines if necessary
-read -formal {sv_filename}
+read -formal {sv_memtile_filename} {sv_garnet_filename} 
 
 # prep does a conservative elaboration
 # of the top module provided

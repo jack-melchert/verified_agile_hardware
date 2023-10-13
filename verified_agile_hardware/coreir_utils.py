@@ -116,7 +116,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         config_inputs = sorted(config_inputs.items(), key=lambda x: x[0])
 
         mem, mem_inputs, mem_outputs = load_new_mem_tile(
-            solver, mem_name, mem_tile, data["inst"].metadata
+            solver, mem_name, mem_tile, zip(config, config_inputs)
         )
 
         used_mem_inputs = []
@@ -155,13 +155,13 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         )
         used_mem_inputs.append(mem_inputs[f"mode_excl_{mem_name}"])
 
-        for (idx, val), (name, sym) in zip(config, config_inputs):
-            solver.assert_formula(
-                solver.create_term(
-                    solver.ops.Equal, sym, solver.create_const(val, sym.get_sort())
-                )
-            )
-            used_mem_inputs.append(sym)
+        # for (idx, val), (name, sym) in zip(config, config_inputs):
+        # solver.assert_formula(
+        #     solver.create_term(
+        #         solver.ops.Equal, sym, solver.create_const(val, sym.get_sort())
+        #     )
+        # )
+        # used_mem_inputs.append(sym)
 
         # Annoying port remapping stuff here
         port_remap = mem_tile.core.get_port_remap()

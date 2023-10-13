@@ -9,7 +9,7 @@ class MemtileConfig(kts.Generator):
 
         # self._clk = self.clock("clk")
 
-        memtile_kts.core.CC.wrapper("/aha/test.sv", name)
+        # memtile_kts.core.CC.wrapper("/aha/test.sv", name)
         # self.add_child_generator(name, memtile_kts.core.dut)
 
         # kts.passes.create_module_instantiation(self[name].internal_generator)
