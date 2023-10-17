@@ -1,5 +1,6 @@
 from verified_agile_hardware.solver import Solver, Rewriter
 import smt_switch as ss
+import pono
 
 
 def test_fts():
@@ -46,6 +47,29 @@ def test_fts():
     )
 
     assert solver.check_sat().is_unsat()
+
+
+def test_bmc():
+    solver = Solver()
+
+    bvsort16 = solver.create_bvsort(16)
+
+    x = solver.create_fts_state_var("x", bvsort16)
+
+    solver.fts.constrain_init(
+        solver.create_term(solver.ops.Equal, x, solver.create_term(0, bvsort16))
+    )
+    solver.fts.assign_next(x, x)
+
+    prop = pono.Property(
+        solver.solver,
+        solver.create_term(solver.ops.Equal, x, solver.create_term(1, bvsort16)),
+    )
+
+    bmc = pono.Bmc(prop, solver.fts, solver.solver)
+    res = bmc.check_until(10)
+
+    assert res is not None
 
 
 def test_function():

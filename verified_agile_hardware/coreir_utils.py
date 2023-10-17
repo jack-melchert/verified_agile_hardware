@@ -204,6 +204,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         unused_mem_inputs = {
             k: v for k, v in mem_inputs.items() if v not in used_mem_inputs
         }
+
         for k, v in unused_mem_inputs.items():
             if "config" in k:
                 solver.assert_formula(
@@ -271,6 +272,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
 
 def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
     solver = Solver()
+    solver.solver.set_opt("produce-models", "true")
     solver.file_info = file_info
     solver.app_dir = f"{app_dir}/verification"
 

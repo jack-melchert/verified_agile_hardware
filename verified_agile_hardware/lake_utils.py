@@ -125,6 +125,7 @@ def load_new_mem_tile(solver, mem_name, mem_tile, configs):
     btor_file = f"{solver.app_dir}/{mem_name}_configed.btor"
 
     mem_tile_to_btor(
+        solver.app_dir,
         "/aha/garnet/garnet.v",
         f"{solver.app_dir}/{mem_name}_configed.sv",
         mem_tile_module=f"{mem_name}",

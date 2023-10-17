@@ -31,7 +31,7 @@ def run_yosys_script(script, yosys_path="yosys"):
     print("Finished running Yosys script.")
 
 
-def sv2v(sv_filename, sv2v_path="sv2v"):
+def sv2v(sv_filename, v_filename, sv2v_path="sv2v"):
     """Convert a SystemVerilog file to Verilog using sv2v."""
     # Check if sv2v is installed
     try:
@@ -50,16 +50,14 @@ def sv2v(sv_filename, sv2v_path="sv2v"):
     stdout, stderr = p.communicate()
 
     # create filename in directory of this file
-    filename = sv_filename.replace(".sv", ".v")
     print("Done running sv2v on " + sv_filename + ".")
-    print("Writing output to " + filename + "...")
-    with open(filename, "w") as f:
+    print("Writing output to " + v_filename + "...")
+    with open(v_filename, "w") as f:
         f.write(stdout.decode("utf-8"))
-
-    return filename
 
 
 def mem_tile_to_btor(
+    app_dir="/aha/",
     garnet_filename="/aha/garnet/garnet.v",
     memtile_filename="/aha/garnet/garnet.v",
     mem_tile_module="strg_ub_vec_flat",
@@ -80,27 +78,30 @@ def mem_tile_to_btor(
     except FileNotFoundError:
         raise FileNotFoundError(f"Could not find {memtile_filename}")
 
-    sv_garnet_filename = sv2v(garnet_filename)
-    sv_memtile_filename = sv2v(memtile_filename)
-
-    # Check if sv_filename exists
-    try:
-        with open(sv_garnet_filename, "r") as f:
-            pass
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Could not find {sv_garnet_filename}, sv2v failed.")
+    sv2v_garnet_filename = (
+        app_dir + "/" + os.path.basename(garnet_filename).replace(".sv", ".v")
+    )
+    sv2v_memtile_filename = (
+        app_dir + "/" + os.path.basename(memtile_filename).replace(".sv", ".v")
+    )
 
     try:
-        with open(sv_memtile_filename, "r") as f:
+        with open(sv2v_garnet_filename, "r") as f:
             pass
     except FileNotFoundError:
-        raise FileNotFoundError(f"Could not find {sv_memtile_filename}, sv2v failed.")
+        sv2v(garnet_filename, sv2v_garnet_filename)
+
+    try:
+        with open(sv2v_memtile_filename, "r") as f:
+            pass
+    except FileNotFoundError:
+        sv2v(memtile_filename, sv2v_memtile_filename)
 
     script = f"""
 # read in the file(s) -- there can be multiple
 # whitespace separated files, and you can
 # escape new lines if necessary
-read -formal {sv_memtile_filename} {sv_garnet_filename} 
+read -formal {sv2v_memtile_filename} {sv2v_garnet_filename} 
 
 # prep does a conservative elaboration
 # of the top module provided
@@ -140,6 +141,7 @@ flatten;
 # IMPORTANT NOTE: the clocks are not
 # automatically toggled if you use this option
 clk2fflogic;
+opt;
 
 # This turns all undriven signals into
 # inputs
