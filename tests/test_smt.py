@@ -55,21 +55,26 @@ def test_bmc():
     bvsort16 = solver.create_bvsort(16)
 
     x = solver.create_fts_state_var("x", bvsort16)
+    y = solver.create_fts_state_var("y", bvsort16)
 
     solver.fts.constrain_init(
         solver.create_term(solver.ops.Equal, x, solver.create_term(0, bvsort16))
     )
     solver.fts.assign_next(x, x)
 
+    solver.fts.add_invar(
+        solver.create_term(solver.ops.Equal, x, y),
+    )
+
     prop = pono.Property(
         solver.solver,
-        solver.create_term(solver.ops.Equal, x, solver.create_term(1, bvsort16)),
+        solver.create_term(solver.ops.Equal, y, solver.create_term(0, bvsort16)),
     )
 
     bmc = pono.Bmc(prop, solver.fts, solver.solver)
     res = bmc.check_until(10)
 
-    assert res is not None
+    assert res is None
 
 
 def test_function():

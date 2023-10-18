@@ -8,15 +8,13 @@ import kratos as kts
 import json
 
 
-def get_mem_btor_outputs(solver, btor_filename, mem_name=""):
+def get_mem_btor_outputs(solver, btor_filename):
     output_symbols = {}
     with open(btor_filename) as f:
         for line in f:
             if " output " in line:
                 output_var = line.split()[3]
-                output_symbols[output_var + mem_name] = solver.fts.lookup(
-                    output_var + mem_name
-                )
+                output_symbols[output_var] = solver.fts.lookup(output_var)
 
     return output_symbols
 
@@ -58,12 +56,14 @@ def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):
     for in_, bw, packed, size in inputs_and_bw:
         if in_ in config_dict:
             continue
+        in_ += f"_{mem_name}"
         if packed:
             verilog += f"input wire [{size-1}:0] [{bw-1}:0] {in_},\n"
         else:
             verilog += f"input wire [{bw-1}:0] {in_},\n"
 
     for in_, bw, packed, size in outputs_and_bw:
+        in_ += f"_{mem_name}"
         if packed:
             verilog += f"output wire [{size-1}:0] [{bw-1}:0] {in_},\n"
         else:
@@ -71,51 +71,22 @@ def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):
 
     verilog += ");\n"
 
-    verilog += f"{mem_tile.core.dut.name} {mem_tile.core.dut.name}_inst (\n"
+    verilog += f"{mem_tile.core.dut.name} {mem_tile.core.dut.name}_{mem_name} (\n"
 
     for in_, bw, packed, size in inputs_and_bw:
         if in_ in config_dict:
             verilog += f".{in_}({config_dict[in_][1]}'d{config_dict[in_][0]}),\n"
         else:
-            verilog += f".{in_}({in_}),\n"
+            verilog += f".{in_}({in_}_{mem_name}),\n"
 
     for in_, bw, packed, size in outputs_and_bw:
-        verilog += f".{in_}({in_}),\n"
+        verilog += f".{in_}({in_}_{mem_name}),\n"
 
     verilog += ");\n"
     verilog += "endmodule\n"
 
-    # write verilog to file
     with open(f"{solver.app_dir}/{mem_name}_configed.sv", "w") as f:
         f.write(verilog)
-
-    # kts_mem_tile = MemtileConfig(mem_name, mem_tile, configs)
-    # kts_mem_tile = kts.Generator(f"{mem_name}_config", internal_generator=mem_tile.core.dut.internal_generator)
-
-    # flattened = create_wrapper_flatten(mem_tile.core.dut.internal_generator, f"{mem_name}")
-    # flattened_gen = kts.Generator(f"{mem_name}", internal_generator=flattened)
-    # import _kratos
-    # _kratos.passes.create_module_instantiation(mem_tile.core.dut.internal_generator)
-    # breakpoint()
-    # kts.Generator.clear_context_hash()
-    # kts.verilog(flattened_gen, filename=f"{solver.app_dir}/{mem_name}_configed.sv")
-
-    # Write configs to file
-    # config_file = f"{solver.app_dir}/{mem_name}_config.json"
-    # write_config = configs["config"]
-    # write_config["mode"] = "UB"
-
-    # with open(config_file, "w") as f:
-    #     json.dump(write_config, f, indent=4)
-
-    # kts.Generator.clear_context_hash()
-    # mem_tile.core.CC.wrapper(
-    #     wrapper_vlog_filename=f"{solver.app_dir}/{mem_name}_configed.sv",
-    #     wrapper_vlog_modulename=f"{mem_name}_config",
-    #     config_path=config_file,
-    #     externally_define=False,
-    # )
-    # breakpoint()
 
 
 def load_new_mem_tile(solver, mem_name, mem_tile, configs):
@@ -132,14 +103,7 @@ def load_new_mem_tile(solver, mem_name, mem_tile, configs):
         btor_filename=btor_file,
     )
 
-    if not solver.mem_tile_vars:
-        solver.read_btor2(btor_file)
-        solver.mem_tile_vars = get_mem_btor_outputs(solver, btor_file)
-        solver.mem_tile_vars.update(solver.fts.state_updates)
+    solver.read_btor2(btor_file)
+    mem_inputs = get_mem_inputs(solver, mem_name)
 
-    r0 = Rewriter(solver, solver.mem_tile_vars.values(), f"_{mem_name}")
-    r0.rewrite()
-
-    mem_inputs = get_mem_inputs(solver, f"_{mem_name}")
-
-    return r0, mem_inputs, get_mem_btor_outputs(solver, btor_file, f"_{mem_name}")
+    return mem_inputs, get_mem_btor_outputs(solver, btor_file)
