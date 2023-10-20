@@ -107,3 +107,4 @@ def load_new_mem_tile(solver, mem_name, mem_tile, configs):
     mem_inputs = get_mem_inputs(solver, mem_name)
 
     return mem_inputs, get_mem_btor_outputs(solver, btor_file)
+

@@ -316,7 +316,7 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
         sink_symbol = node_symbols[sink][f'{sink}.{data["sink_port"]}']
-        solver.fts.constrain_inputs(
+        solver.fts.add_invar(
             solver.create_term(solver.ops.Equal, source_symbol, sink_symbol)
         )
 

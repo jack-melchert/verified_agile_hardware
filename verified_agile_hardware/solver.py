@@ -6,7 +6,7 @@ import os
 
 class Solver:
     def __init__(self):
-        self.fe_solver = fe.Solver("cvc5")
+        self.fe_solver = fe.Solver('cvc5')
         self.solver = self.fe_solver.solver
         self.convert = self.fe_solver.converter.convert
         self.fts = pono.FunctionalTransitionSystem(self.solver)
