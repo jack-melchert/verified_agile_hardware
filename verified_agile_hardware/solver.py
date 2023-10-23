@@ -6,7 +6,7 @@ import os
 
 class Solver:
     def __init__(self):
-        self.fe_solver = fe.Solver('cvc5')
+        self.fe_solver = fe.Solver("cvc5")
         self.solver = self.fe_solver.solver
         self.convert = self.fe_solver.converter.convert
         self.fts = pono.FunctionalTransitionSystem(self.solver)
@@ -19,6 +19,20 @@ class Solver:
         self.rsts = []
         self.clks = []
         self.flushes = []
+
+        bvsort16 = self.solver.make_sort(ss.sortkinds.BV, 16)
+        self.bmc_counter = self.fts.make_statevar("bmc_counter", bvsort16)
+        self.fts.constrain_init(
+            self.solver.make_term(
+                ss.primops.Equal, self.bmc_counter, self.solver.make_term(0, bvsort16)
+            )
+        )
+        self.fts.assign_next(
+            self.bmc_counter,
+            self.solver.make_term(
+                ss.primops.BVAdd, self.bmc_counter, self.solver.make_term(1, bvsort16)
+            ),
+        )
 
     def create_bvsort(self, width):
         return self.solver.make_sort(ss.sortkinds.BV, width)
@@ -46,6 +60,29 @@ class Solver:
 
     def assert_formula(self, formula):
         self.solver.assert_formula(formula)
+
+    def fts_assert_at_times(self, var, val_at_times, val_at_other_times, times):
+        assert len(times) > 0, "Must have at least one time"
+
+        bvsort16 = self.solver.make_sort(ss.sortkinds.BV, 16)
+        times = [self.solver.make_term(t, bvsort16) for t in times]
+        # times is list of times that val_at_times should be true
+        # construct ite that is true at times and false at other times
+        eq = self.fts.make_term(self.ops.Equal, self.bmc_counter, times[0])
+        for time in times[1:]:
+            eq = self.fts.make_term(
+                self.ops.Or,
+                eq,
+                self.fts.make_term(self.ops.Equal, self.bmc_counter, time),
+            )
+
+        self.fts.add_invar(
+            self.fts.make_term(
+                self.ops.Equal,
+                var,
+                self.fts.make_term(self.ops.Ite, eq, val_at_times, val_at_other_times),
+            )
+        )
 
     def read_btor2(self, filename):
         if not os.path.isfile(filename):

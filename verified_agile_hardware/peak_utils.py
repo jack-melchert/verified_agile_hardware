@@ -170,4 +170,9 @@ def load_pe_tile(solver, PE_fc, pe_name="", out_port_names=()):
 
     o = solver.solver.substitute(o, mapping)
 
-    return o, bboxes
+    pe_inputs = get_pe_inputs(solver, pe_name)
+
+    for input_var in pe_inputs:
+        solver.fts.promote_inputvar(input_var)
+
+    return o, bboxes, pe_inputs

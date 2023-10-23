@@ -35,7 +35,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
         for in_symbol in in_symbols:
             for out_symbol in out_symbols:
-                solver.fts.constrain_inputs(
+                solver.fts.add_invar(
                     solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
                 )
     elif tile_type == "global.PE":
@@ -45,14 +45,10 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
             str(out_symbol).split(f"{data['inst'].name}.")[1]
             for out_symbol in out_symbols
         ]
-        pe0, bboxes0 = load_pe_tile(
+        pe0, bboxes0, pe_inputs = load_pe_tile(
             solver, PE_fc, pe_name=data["inst"].name, out_port_names=out_port_names
         )
         solver.bboxes.update(bboxes0)
-        pe_inputs = get_pe_inputs(solver, data["inst"].name)
-
-        # for input_var in pe_inputs:
-        #     solver.fts.promote_inputvar(input_var)
 
         pe_inputs = {str(i): i for i in pe_inputs}
 
@@ -65,7 +61,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                     in_symbol,
                     solver.create_const(1, solver.create_bvsort(1)),
                 )
-                solver.fts.constrain_inputs(
+                solver.fts.add_invar(
                     solver.create_term(
                         solver.ops.Equal,
                         new_in_symbol,
@@ -73,7 +69,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                     )
                 )
             else:
-                solver.fts.constrain_inputs(
+                solver.fts.add_invar(
                     solver.create_term(
                         solver.ops.Equal,
                         in_symbol,
@@ -99,7 +95,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
             ext = ss.Op(ss.primops.Extract, end, start)
             ext_pe = solver.create_term(ext, pe0)
 
-            solver.fts.constrain_inputs(
+            solver.fts.add_invar(
                 solver.create_term(solver.ops.Equal, out_symbol, ext_pe)
             )
     elif tile_type == "cgralib.Mem":
@@ -134,7 +130,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         used_mem_inputs.append(mem_inputs[f"flush_{mem_name}"])
 
         # tile_en, mode, and config signals, going to hardcode these
-        solver.fts.constrain_inputs(
+        solver.fts.add_invar(
             solver.create_term(
                 solver.ops.Equal,
                 mem_inputs[f"tile_en_{mem_name}"],
@@ -143,7 +139,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         )
         used_mem_inputs.append(mem_inputs[f"tile_en_{mem_name}"])
 
-        solver.fts.constrain_inputs(
+        solver.fts.add_invar(
             solver.create_term(
                 solver.ops.Equal,
                 mem_inputs[f"mode_{mem_name}"],
@@ -152,7 +148,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         )
         used_mem_inputs.append(mem_inputs[f"mode_{mem_name}"])
 
-        solver.fts.constrain_inputs(
+        solver.fts.add_invar(
             solver.create_term(
                 solver.ops.Equal,
                 mem_inputs[f"mode_excl_{mem_name}"],
@@ -190,7 +186,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                     mem_inputs[f"{port}_{mem_name}"],
                 )
 
-            solver.fts.constrain_inputs(
+            solver.fts.add_invar(
                 solver.create_term(
                     solver.ops.Equal,
                     in_symbol,
@@ -205,7 +201,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
 
         for k, v in unused_mem_inputs.items():
             if "config" in k:
-                solver.fts.constrain_inputs(
+                solver.fts.add_invar(
                     solver.create_term(
                         solver.ops.Equal, v, solver.create_const(0, v.get_sort())
                     )
@@ -228,7 +224,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                     mem_outputs[f"{port}_{mem_name}"],
                 )
 
-            solver.fts.constrain_inputs(
+            solver.fts.add_invar(
                 solver.create_term(
                     solver.ops.Equal,
                     out_symbol,
@@ -240,17 +236,18 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         breakpoint()
     elif tile_type == "coreir.reg":
         name = data["inst"].name
-        reg_in = solver.create_fts_input_var(f"{name}.reg_in", in_symbols[0].get_sort())
+        # reg_in = solver.create_fts_input_var(f"{name}.reg_in", in_symbols[0].get_sort())
         reg_val = solver.create_fts_state_var(
             f"{name}.reg_val", in_symbols[0].get_sort()
         )
         for in_symbol in in_symbols:
-            solver.fts.constrain_inputs(
-                solver.create_term(solver.ops.Equal, in_symbol, reg_in)
-            )
-        solver.fts.assign_next(reg_val, reg_in)
+            # solver.fts.constrain_inputs(
+            #     solver.create_term(solver.ops.Equal, in_symbol, reg_in)
+            # )
+            solver.fts.assign_next(reg_val, in_symbol)
+
         for out_symbol in out_symbols:
-            solver.fts.constrain_inputs(
+            solver.fts.add_invar(
                 solver.create_term(solver.ops.Equal, out_symbol, reg_val)
             )
     elif tile_type == "corebit.const" or tile_type == "coreir.const":
@@ -261,7 +258,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         else:
             value = value.value
         const = solver.create_const(value, out_symbols[0].get_sort())
-        solver.fts.constrain_inputs(
+        solver.fts.add_invar(
             solver.create_term(solver.ops.Equal, out_symbols[0], const)
         )
     else:

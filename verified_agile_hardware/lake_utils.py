@@ -29,6 +29,7 @@ def get_mem_inputs(solver, mem_name):
 
     input_dict = {}
     for i in input_vars:
+        solver.fts.promote_inputvar(i)
         input_dict[str(i)] = i
     return input_dict
 
@@ -107,4 +108,3 @@ def load_new_mem_tile(solver, mem_name, mem_tile, configs):
     mem_inputs = get_mem_inputs(solver, mem_name)
 
     return mem_inputs, get_mem_btor_outputs(solver, btor_file)
-
