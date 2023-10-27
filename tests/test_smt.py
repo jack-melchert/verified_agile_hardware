@@ -49,7 +49,6 @@ def test_fts():
     assert solver.check_sat().is_unsat()
 
 
-
 def test_bmc():
     solver = Solver()
 
@@ -64,9 +63,39 @@ def test_bmc():
 
     prop = pono.Property(
         solver.solver,
-        solver.create_term(solver.ops.Not,
+        solver.create_term(
+            solver.ops.Not,
             solver.create_term(solver.ops.Equal, x, y),
-        )
+        ),
+    )
+
+    bmc = pono.Bmc(prop, solver.fts, solver.solver)
+    res = bmc.check_until(1)
+
+    assert res is not None
+    assert not res
+
+
+def test_bmc_terms():
+    solver = Solver()
+
+    bvsort16 = solver.create_bvsort(16)
+
+    x = solver.create_fts_state_var("x", bvsort16)
+    y = solver.create_fts_input_var("y", bvsort16)
+    solver.fts.promote_inputvar(y)
+
+    t = solver.fts.make_term(solver.ops.Equal, x, y)
+    solver.fts.name_term("t", t)
+
+    solver.fts.add_invar(t)
+
+    prop = pono.Property(
+        solver.solver,
+        solver.create_term(
+            solver.ops.Not,
+            solver.create_term(solver.ops.Equal, x, y),
+        ),
     )
 
     bmc = pono.Bmc(prop, solver.fts, solver.solver)
@@ -117,12 +146,22 @@ def test_bmc_counter():
 
     # x = solver.create_fts_input_var("x", bvsort16)
     count = solver.create_fts_state_var("count", bvsort16)
-    solver.fts.constrain_init(solver.create_term(solver.ops.Equal, count, solver.create_term(0, bvsort16)))
-    solver.fts.assign_next(count, solver.create_term(solver.ops.BVAdd, count, solver.create_term(1, bvsort16)))
+    solver.fts.constrain_init(
+        solver.create_term(solver.ops.Equal, count, solver.create_term(0, bvsort16))
+    )
+    solver.fts.assign_next(
+        count,
+        solver.create_term(solver.ops.BVAdd, count, solver.create_term(1, bvsort16)),
+    )
 
     count2 = solver.create_fts_state_var("count2", bvsort16)
-    solver.fts.constrain_init(solver.create_term(solver.ops.Equal, count2, solver.create_term(0, bvsort16)))
-    solver.fts.assign_next(count2, solver.create_term(solver.ops.BVAdd, count2, solver.create_term(1, bvsort16)))
+    solver.fts.constrain_init(
+        solver.create_term(solver.ops.Equal, count2, solver.create_term(0, bvsort16))
+    )
+    solver.fts.assign_next(
+        count2,
+        solver.create_term(solver.ops.BVAdd, count2, solver.create_term(1, bvsort16)),
+    )
 
     prop = pono.Property(
         solver.solver,
@@ -142,23 +181,53 @@ def test_bmc_and_assertions():
 
     # x = solver.create_fts_input_var("x", bvsort16)
     count = solver.create_fts_state_var("count", bvsort16)
-    solver.fts.constrain_init(solver.create_term(solver.ops.Equal, count, solver.create_term(0, bvsort16)))
-    solver.fts.assign_next(count, solver.create_term(solver.ops.BVAdd, count, solver.create_term(1, bvsort16)))
+    solver.fts.constrain_init(
+        solver.create_term(solver.ops.Equal, count, solver.create_term(0, bvsort16))
+    )
+    solver.fts.assign_next(
+        count,
+        solver.create_term(solver.ops.BVAdd, count, solver.create_term(1, bvsort16)),
+    )
 
     count2 = solver.create_fts_state_var("count2", bvsort16)
-    solver.fts.constrain_init(solver.create_term(solver.ops.Equal, count2, solver.create_term(0, bvsort16)))
+    solver.fts.constrain_init(
+        solver.create_term(solver.ops.Equal, count2, solver.create_term(0, bvsort16))
+    )
 
-    eq_0 = solver.fts.make_term(solver.ops.Equal, count, solver.fts.make_term(0, bvsort16))
-    eq_1 = solver.fts.make_term(solver.ops.Equal, count, solver.fts.make_term(1, bvsort16))
-    eq_2 = solver.fts.make_term(solver.ops.Equal, count, solver.fts.make_term(2, bvsort16))
-    eq_3 = solver.fts.make_term(solver.ops.Equal, count, solver.fts.make_term(3, bvsort16))
-    eq_4 = solver.fts.make_term(solver.ops.Equal, count, solver.fts.make_term(4, bvsort16))
+    eq_0 = solver.fts.make_term(
+        solver.ops.Equal, count, solver.fts.make_term(0, bvsort16)
+    )
+    eq_1 = solver.fts.make_term(
+        solver.ops.Equal, count, solver.fts.make_term(1, bvsort16)
+    )
+    eq_2 = solver.fts.make_term(
+        solver.ops.Equal, count, solver.fts.make_term(2, bvsort16)
+    )
+    eq_3 = solver.fts.make_term(
+        solver.ops.Equal, count, solver.fts.make_term(3, bvsort16)
+    )
+    eq_4 = solver.fts.make_term(
+        solver.ops.Equal, count, solver.fts.make_term(4, bvsort16)
+    )
 
-    ite_0 = solver.fts.make_term(solver.ops.Ite, eq_0, solver.fts.make_term(1, bvsort16), solver.fts.make_term(0, bvsort16))
-    ite_1 = solver.fts.make_term(solver.ops.Ite, eq_1, solver.fts.make_term(2, bvsort16), ite_0)
-    ite_2 = solver.fts.make_term(solver.ops.Ite, eq_2, solver.fts.make_term(3, bvsort16), ite_1)
-    ite_3 = solver.fts.make_term(solver.ops.Ite, eq_3, solver.fts.make_term(4, bvsort16), ite_2)
-    ite_4 = solver.fts.make_term(solver.ops.Ite, eq_4, solver.fts.make_term(5, bvsort16), ite_3)
+    ite_0 = solver.fts.make_term(
+        solver.ops.Ite,
+        eq_0,
+        solver.fts.make_term(1, bvsort16),
+        solver.fts.make_term(0, bvsort16),
+    )
+    ite_1 = solver.fts.make_term(
+        solver.ops.Ite, eq_1, solver.fts.make_term(2, bvsort16), ite_0
+    )
+    ite_2 = solver.fts.make_term(
+        solver.ops.Ite, eq_2, solver.fts.make_term(3, bvsort16), ite_1
+    )
+    ite_3 = solver.fts.make_term(
+        solver.ops.Ite, eq_3, solver.fts.make_term(4, bvsort16), ite_2
+    )
+    ite_4 = solver.fts.make_term(
+        solver.ops.Ite, eq_4, solver.fts.make_term(5, bvsort16), ite_3
+    )
 
     solver.fts.assign_next(count2, ite_4)
 
@@ -171,6 +240,7 @@ def test_bmc_and_assertions():
     res = bmc.check_until(5)
 
     assert res is None or res
+
 
 def test_function():
     solver = Solver()

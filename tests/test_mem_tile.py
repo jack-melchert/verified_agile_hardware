@@ -32,6 +32,7 @@ def test_mem_tile_btor_file(mem_file):
     solver = Solver()
     solver.read_btor2(mem_file)
 
+
 @pytest.mark.parametrize(
     "mem_file",
     [
@@ -48,11 +49,14 @@ def test_bmc_mem_tile(mem_file):
 
     prop = pono.Property(
         solver.solver,
-        solver.create_term(solver.ops.Equal, solver.create_term(0, bvsort16), solver.create_term(0, bvsort16)),
+        solver.create_term(
+            solver.ops.Equal,
+            solver.create_term(0, bvsort16),
+            solver.create_term(0, bvsort16),
+        ),
     )
 
     bmc = pono.Bmc(prop, solver.fts, solver.solver)
     res = bmc.check_until(2)
 
     assert res is None
-

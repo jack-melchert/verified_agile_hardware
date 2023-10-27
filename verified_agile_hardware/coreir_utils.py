@@ -219,7 +219,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
             ):
                 mem_output = mem_outputs[f"{port}_{mem_name}"]
             else:
-                mem_output = solver.create_term(
+                mem_output = solver.fts.make_term(
                     ss.Op(ss.primops.Extract, out_symbol_width - 1, 0),
                     mem_outputs[f"{port}_{mem_name}"],
                 )
@@ -231,6 +231,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                     mem_output,
                 )
             )
+
 
     elif tile_type == "cgralib.Pond":
         breakpoint()

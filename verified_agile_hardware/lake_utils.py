@@ -22,6 +22,7 @@ def get_mem_btor_outputs(solver, btor_filename):
 def get_mem_inputs(solver, mem_name):
     input_vars = []
     for i in solver.fts.inputvars:
+        solver.fts.promote_inputvar(i) 
         if mem_name in str(i):
             input_vars.append(i)
 
@@ -29,7 +30,6 @@ def get_mem_inputs(solver, mem_name):
 
     input_dict = {}
     for i in input_vars:
-        solver.fts.promote_inputvar(i)
         input_dict[str(i)] = i
     return input_dict
 
@@ -94,6 +94,10 @@ def load_new_mem_tile(solver, mem_name, mem_tile, configs):
     # Write kratos configs to configure mem tile
     produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name)
 
+    unique = solver.num_memtiles + 12345
+    solver.num_memtiles += 1
+
+    btor_file_t = f"{solver.app_dir}/{mem_name}_configed_temp.btor"
     btor_file = f"{solver.app_dir}/{mem_name}_configed.btor"
 
     mem_tile_to_btor(
@@ -101,10 +105,44 @@ def load_new_mem_tile(solver, mem_name, mem_tile, configs):
         "/aha/garnet/garnet.v",
         f"{solver.app_dir}/{mem_name}_configed.sv",
         mem_tile_module=f"{mem_name}",
-        btor_filename=btor_file,
+        btor_filename=btor_file_t,
     )
 
+    f = open(btor_file_t, "r")
+    lines = f.readlines()
+    f.close()
+
+    rewritten_terms = {}
+
+    for l_idx, line in enumerate(lines):
+        split_lines = line.split()
+        if split_lines[0].isnumeric():
+            rewritten_terms[split_lines[0]] = str(unique) + split_lines[0]
+
+        for s_idx, s in enumerate(split_lines):
+            if "sort" == split_lines[1] and s_idx > 1 and "array" != split_lines[2]:
+                continue
+
+            if "const" == split_lines[1] and s_idx > 2:
+                continue
+
+            if ("uext" == split_lines[1] or "sext" == split_lines[1]) and s_idx > 3:
+                continue
+
+            if "slice" == split_lines[1] and s_idx > 3:
+                continue
+
+            if s in rewritten_terms: 
+                split_lines[s_idx] = rewritten_terms[s]
+    
+        lines[l_idx] = " ".join(split_lines) + "\n"
+
+    f = open(btor_file, "w")
+    f.writelines(lines)
+    f.close()
+
     solver.read_btor2(btor_file)
+
     mem_inputs = get_mem_inputs(solver, mem_name)
 
     return mem_inputs, get_mem_btor_outputs(solver, btor_file)

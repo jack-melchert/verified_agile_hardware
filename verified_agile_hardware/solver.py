@@ -6,7 +6,7 @@ import os
 
 class Solver:
     def __init__(self):
-        self.fe_solver = fe.Solver("cvc5")
+        self.fe_solver = fe.Solver("bitwuzla")
         self.solver = self.fe_solver.solver
         self.convert = self.fe_solver.converter.convert
         self.fts = pono.FunctionalTransitionSystem(self.solver)
@@ -19,6 +19,7 @@ class Solver:
         self.rsts = []
         self.clks = []
         self.flushes = []
+        self.num_memtiles = 0
 
         bvsort16 = self.solver.make_sort(ss.sortkinds.BV, 16)
         self.bmc_counter = self.fts.make_statevar("bmc_counter", bvsort16)
@@ -144,6 +145,7 @@ class Rewriter(ss.TermDagVisitor):
                 new_term = self._solver.create_fts_state_var(name, sort)
             else:
                 new_term = self._solver.create_symbol(name, sort)
+
 
         else:
             new_term = term
