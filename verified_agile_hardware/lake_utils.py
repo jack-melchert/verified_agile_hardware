@@ -22,7 +22,7 @@ def get_mem_btor_outputs(solver, btor_filename):
 def get_mem_inputs(solver, mem_name):
     input_vars = []
     for i in solver.fts.inputvars:
-        solver.fts.promote_inputvar(i) 
+        solver.fts.promote_inputvar(i)
         if mem_name in str(i):
             input_vars.append(i)
 
@@ -132,9 +132,9 @@ def load_new_mem_tile(solver, mem_name, mem_tile, configs):
             if "slice" == split_lines[1] and s_idx > 3:
                 continue
 
-            if s in rewritten_terms: 
+            if s in rewritten_terms:
                 split_lines[s_idx] = rewritten_terms[s]
-    
+
         lines[l_idx] = " ".join(split_lines) + "\n"
 
     f = open(btor_file, "w")

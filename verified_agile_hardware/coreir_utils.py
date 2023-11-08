@@ -232,20 +232,17 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                 )
             )
 
-
     elif tile_type == "cgralib.Pond":
         breakpoint()
     elif tile_type == "coreir.reg":
         name = data["inst"].name
-        # reg_in = solver.create_fts_input_var(f"{name}.reg_in", in_symbols[0].get_sort())
+        reg_in = solver.create_fts_state_var(f"{name}.reg_in", in_symbols[0].get_sort())
         reg_val = solver.create_fts_state_var(
             f"{name}.reg_val", in_symbols[0].get_sort()
         )
         for in_symbol in in_symbols:
-            # solver.fts.constrain_inputs(
-            #     solver.create_term(solver.ops.Equal, in_symbol, reg_in)
-            # )
-            solver.fts.assign_next(reg_val, in_symbol)
+            solver.fts.assign_next(reg_in, in_symbol)
+            solver.fts.assign_next(reg_val, reg_in)
 
         for out_symbol in out_symbols:
             solver.fts.add_invar(

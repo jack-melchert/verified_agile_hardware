@@ -163,7 +163,11 @@ def load_pe_tile(solver, PE_fc, pe_name="", out_port_names=()):
         reg = solver.convert(reg.value)
         reg_next = solver.convert(reg_next.value)
         reg_next = solver.solver.substitute(reg_next, mapping)
-        solver.fts.assign_next(mapping[reg], reg_next)
+        intermediate_reg = solver.fts.make_statevar(
+            str(mapping[reg]) + "_intermediate", reg.get_sort()
+        )
+        solver.fts.assign_next(intermediate_reg, reg_next)
+        solver.fts.assign_next(mapping[reg], intermediate_reg)
 
     # for port, out in outputs:
     #     outputs[port] = solver.solver.substitute(out, mapping)
