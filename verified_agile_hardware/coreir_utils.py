@@ -38,6 +38,10 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                 solver.fts.add_invar(
                     solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
                 )
+        if "output" in data["inst"].name:
+            if "in2glb_0" in data["inst"].metadata:
+                solver.first_valid_output = min(solver.first_valid_output, data["inst"].metadata["in2glb_0"]["cycle_starting_addr"][0])
+
     elif tile_type == "global.PE":
         # for each output symbol, convert only formula associated with that symbol, not the whole PE
 
@@ -234,7 +238,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
 
     elif tile_type == "cgralib.Pond":
         breakpoint()
-    elif tile_type == "coreir.reg":
+    elif tile_type == "coreir.reg" or tile_type == "corebit.reg":
         name = data["inst"].name
         reg_in = solver.create_fts_state_var(f"{name}.reg_in", in_symbols[0].get_sort())
         reg_val = solver.create_fts_state_var(
