@@ -38,9 +38,6 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                 solver.fts.add_invar(
                     solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
                 )
-        if "output" in data["inst"].name:
-            if "in2glb_0" in data["inst"].metadata:
-                solver.first_valid_output = min(solver.first_valid_output, data["inst"].metadata["in2glb_0"]["cycle_starting_addr"][0])
 
     elif tile_type == "global.PE":
         # for each output symbol, convert only formula associated with that symbol, not the whole PE
@@ -104,6 +101,10 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
             )
     elif tile_type == "cgralib.Mem":
         mem_name = data["inst"].name
+
+        if "port_controller" in mem_name:
+            valid_out_starting_cycle = data["inst"].metadata["config"]["stencil_valid"]['cycle_starting_addr'][0]
+            solver.first_valid_output = min(solver.first_valid_output, valid_out_starting_cycle)
 
         # Need to configure memory here
         mem_tile = solver.interconnect.tile_circuits[(3, 1)]
