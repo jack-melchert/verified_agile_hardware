@@ -31,7 +31,41 @@ def get_mem_inputs(solver, mem_name):
     input_dict = {}
     for i in input_vars:
         input_dict[str(i)] = i
+
     return input_dict
+
+
+def get_mem_sram_var(solver, mem_name, sram_name="data_array"):
+    sram_vars = []
+    for sv in solver.fts.statevars:
+        if sram_name in str(sv) and mem_name in str(sv):
+            sram_vars.append(sv)
+
+    assert len(sram_vars) == 1, f"Wrong number of SRAMs found: {len(sram_vars)}" 
+
+    return sram_vars[0]
+
+
+def config_rom(solver, mem_name, rom_val):
+    sram_var = get_mem_sram_var(solver, mem_name)
+    sort = sram_var.get_sort()
+    index_sort = sort.get_indexsort()
+    element_sort = sort.get_elemsort()
+
+    rom_val = [8]*256
+    
+    packed_rom_val = []
+    for i in range(0, len(rom_val), 4):
+        packed_rom_val.append(0)
+        for j in range(4):
+            if i + j >= len(rom_val):
+                break
+            packed_rom_val[i//4] = packed_rom_val[i//4] | (rom_val[i + j] << (j * 16))
+
+    for i, val in enumerate(packed_rom_val):
+        sram_var = solver.create_term(solver.ops.Store, sram_var, solver.create_term(i, index_sort), solver.create_term(val, element_sort))
+
+    solver.fts.add_invar(solver.create_term(solver.ops.Equal, sram_var, get_mem_sram_var(solver, mem_name)))
 
 
 def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):
@@ -41,12 +75,12 @@ def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):
     inputs_and_bw = []
     outputs_and_bw = []
 
-    for port in mem_tile.core.dut.ports:
-        direction = mem_tile.core.dut.ports[port].port_direction
-        bw = mem_tile.core.dut.ports[port].width
-        name = mem_tile.core.dut.ports[port].name
-        packed = mem_tile.core.dut.ports[port].is_packed
-        size = mem_tile.core.dut.ports[port].size[0]
+    for port in mem_tile.dut.ports:
+        direction = mem_tile.dut.ports[port].port_direction
+        bw = mem_tile.dut.ports[port].width
+        name = mem_tile.dut.ports[port].name
+        packed = mem_tile.dut.ports[port].is_packed
+        size = mem_tile.dut.ports[port].size[0]
         if direction == kts.PortDirection.In:
             inputs_and_bw.append((name, bw, packed, size))
         else:
@@ -72,7 +106,7 @@ def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):
 
     verilog += ");\n"
 
-    verilog += f"{mem_tile.core.dut.name} {mem_tile.core.dut.name}_{mem_name} (\n"
+    verilog += f"{mem_tile.dut.name} {mem_tile.dut.name}_{mem_name} (\n"
 
     for in_, bw, packed, size in inputs_and_bw:
         if in_ in config_dict:
