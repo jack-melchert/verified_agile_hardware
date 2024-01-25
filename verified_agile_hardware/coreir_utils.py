@@ -31,7 +31,7 @@ def coreir_to_pdf(nx_graph, filename):
     dot.render(filename)
 
 
-def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
+def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
         for in_symbol in in_symbols:
             for out_symbol in out_symbols:
@@ -42,7 +42,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         # for each output symbol, convert only formula associated with that symbol, not the whole PE
 
         out_port_names = [
-            str(out_symbol).split(f"{data['inst'].name}.")[1]
+            str(out_symbol).split(f"{node}.")[1]
             for out_symbol in out_symbols
         ]
         pe0, bboxes0, pe_inputs = load_pe_tile(
@@ -53,7 +53,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         pe_inputs = {str(i): i for i in pe_inputs}
 
         for in_symbol in in_symbols:
-            port = str(in_symbol).split(f"{data['inst'].name}.")[1]
+            port = str(in_symbol).split(f"{node}.")[1]
             width = in_symbol.get_sort().get_width()
             if width == 1:
                 new_in_symbol = solver.create_term(
@@ -77,9 +77,37 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                     )
                 )
 
+        # # This is hardcoded and will break if there are complex PE output types
+        # out_to_slice = {}
+        # curr_bit = 0
+        # for idx, (n, v) in enumerate(PE_fc.SMT.output_t._field_table_.items()):
+        #     if issubclass(v, hwtypes.bit_vector.Bit):
+        #         size = 1
+        #     else:
+        #         size = v.size
+        #     out_to_slice[f"O{idx}"] = (curr_bit, curr_bit + size - 1)
+        #     curr_bit += size
+
+        # port_remap = solver.interconnect.tile_circuits[(1, 1)].core.get_port_remap()
+        # breakpoint()
+
+        # for out_symbol in out_symbols:
+        #     port = str(out_symbol).split(f"{node}.")[1]
+            
+        #     start, end = out_to_slice[port]
+
+        #     ext = ss.Op(ss.primops.Extract, end, start)
+        #     ext_pe = solver.create_term(ext, pe0)
+
+        #     solver.fts.add_invar(
+        #         solver.create_term(solver.ops.Equal, out_symbol, ext_pe)
+        #     )
+        
         # This is hardcoded and will break if there are complex PE output types
         out_to_slice = {}
         curr_bit = 0
+
+        coreir_name_to_peak_name = {}
         for idx, (n, v) in enumerate(PE_fc.SMT.output_t._field_table_.items()):
             if issubclass(v, hwtypes.bit_vector.Bit):
                 size = 1
@@ -87,17 +115,43 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                 size = v.size
             out_to_slice[f"O{idx}"] = (curr_bit, curr_bit + size - 1)
             curr_bit += size
+            coreir_name_to_peak_name[n] = f"O{idx}"
+
+        port_remap = solver.interconnect.tile_circuits[(1, 1)].core.get_port_remap()['alu']
+        port_remap_reversed = {v: k for k, v in port_remap.items()}
 
         for out_symbol in out_symbols:
-            port = str(out_symbol).split(f"{data['inst'].name}.")[1]
-            start, end = out_to_slice[port]
+            port = str(out_symbol).split(f"{node}.")[1]
+
+            if port in out_to_slice:
+                start, end = out_to_slice[port]
+            else:
+                start, end = out_to_slice[coreir_name_to_peak_name[port_remap_reversed[port]]]
 
             ext = ss.Op(ss.primops.Extract, end, start)
             ext_pe = solver.create_term(ext, pe0)
 
-            solver.fts.add_invar(
-                solver.create_term(solver.ops.Equal, out_symbol, ext_pe)
-            )
+            out_symbol_width = out_symbol.get_sort().get_width()
+            if (
+                out_symbol_width
+                == ext_pe.get_sort().get_width()
+            ):
+                solver.fts.add_invar(
+                    solver.create_term(solver.ops.Equal, out_symbol, ext_pe)
+                )
+            else:
+                out_symbol_short = solver.fts.make_term(
+                    ss.Op(ss.primops.Extract, ext_pe.get_sort().get_width() - 1, 0),
+                    out_symbol,
+                )
+                try:
+                    solver.fts.add_invar(
+                        solver.create_term(
+                            solver.ops.Equal, out_symbol_short, ext_pe)
+                    )
+                except:
+                    breakpoint()
+
     elif tile_type == "cgralib.Mem":
         mem_name = data["inst"].name
 
@@ -170,7 +224,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         port_remap = port_remap[mode]
 
         for in_symbol in in_symbols:
-            port = str(in_symbol).split(f"{data['inst'].name}.")[1]
+            port = str(in_symbol).split(f"{node}.")[1]
             if port in port_remap:
                 port = port_remap[port]
 
@@ -208,7 +262,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                 )
 
         for out_symbol in out_symbols:
-            port = str(out_symbol).split(f"{data['inst'].name}.")[1]
+            port = str(out_symbol).split(f"{node}.")[1]
             if port in port_remap:
                 port = port_remap[port]
 
@@ -260,7 +314,8 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
             solver.create_term(solver.ops.Equal, out_symbols[0], const)
         )
     else:
-        raise NotImplementedError(f"Tile type {tile_type} not supported")
+        # raise NotImplementedError(f"Tile type {tile_type} not supported")
+        print("Ignore me")
 
 
 def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
@@ -280,7 +335,7 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
         symbols = {}
 
         in_symbols = []
-        for in_ in graph.in_edges(node):
+        for in_ in graph.in_edges(node): # all edges going into a node?
             edge_info = graph.edges[in_]
             name = f"{in_[1]}.{graph.edges[in_]['sink_port']}"
             if name not in symbols:
@@ -302,11 +357,14 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
 
         if "inst" not in data:
             assert (
-                node == "in" or node == "out"
-            ), "Only in and out nodes should not have an inst attribute"
+                node == "in" or node == "out" or data["node_type"] == "route"
+            # ), "Only in and out nodes should not have an inst attribute"
+            ), "Only route nodes should not have an inst attribute"
+            node_to_smt(solver, "route", in_symbols, out_symbols, data, node)
         else:
             tile_type = data["inst"].module.ref_name
-            node_to_smt(solver, tile_type, in_symbols, out_symbols, data)
+            print(node, " ", in_symbols, " ", out_symbols)
+            node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node)
 
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
@@ -318,16 +376,17 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
     return solver, node_symbols["in"], node_symbols["out"]
 
 
-def coreir_to_nx(cmod):
+def coreir_to_nx(cmod): # cmod = coreir file
     """
     Convert a CoreIR module to a NetworkX graph.
     """
     G = nx.DiGraph()
     for inst in cmod.instances:
         G.add_node(inst.name, inst=inst)
+    # create map from inst.name to inst
 
     for conn in cmod.connections:
-        if conn.first.type.is_input():
+        if conn.first.type.is_input(): # first vertex is input, second vertex must be output?
             assert conn.second.type.is_output()
             source = conn.second.selectpath
             sink = conn.first.selectpath
@@ -365,3 +424,77 @@ def read_coreir(coreir_filename, top_module=None):
     cmod = c.load_from_file(coreir_filename)
 
     return cmod.definition
+
+
+def pnr_to_nx(pmod,cmod): # pmod = pnr file
+    """
+    Convert a PnR module to a NetworkX graph.
+    """
+    g = nx.DiGraph()
+    node_to_inst_dict = dict()
+    # Create a dictionary that maps node names to instances
+    for inst in cmod.instances:
+        node_to_inst_dict[inst.name] = inst
+    
+    for node in pmod.nodes:
+        if (node in pmod.get_tiles()):
+            name = pmod.id_to_name[str(node)]
+        else:
+            name = str(node)
+        # if node is a tile node, map to instance
+        if (name in node_to_inst_dict.keys()):
+        # if (node in pmod.get_tiles()):
+            g.add_node(str(node), 
+            inst = node_to_inst_dict[name],
+            node_type = "tile",
+            node_name = name
+            )
+        else: # if node is a route node, add to graph directly
+            g.add_node(str(node), 
+            node_type = "route",
+            node_name = name)
+            assert(node not in pmod.get_tiles() or node in pmod.get_regs()), f"Tile node that's not register {name} claimed as route node"
+            # if (node in pmod.get_tiles()):
+            #     print(str(node))
+
+    for edge in pmod.edges:
+        #edge[0] = source, edge[1] = sink
+        # if the source node is a tile node that's not a register
+        if (edge[0] in pmod.get_tiles() and edge[0] not in pmod.get_regs()):
+            # iterate through sinks of the node
+            for sink in pmod.sinks[edge[0]]:
+                if sink == edge[1]: # find the sink connected to this edge
+                    source_port = sink.port 
+                    bitwidth = sink.bit_width
+        elif (edge[0] in pmod.get_tiles()): # if a source node is a reg node
+            source_port = "out"
+            for sink in pmod.sinks[edge[0]]:
+                if sink == edge[1]: # find the sink connected to this edge
+                    bitwidth = sink.bit_width
+        else: # if the source node is a port node
+            source_port = "out"
+            bitwidth = edge[0].bit_width
+        if (edge[1] in pmod.get_tiles() and edge[1] not in pmod.get_regs()):
+            # iterate through sources of the node
+            for source in pmod.sources[edge[1]]:
+                if source == edge[0]: # find the sink connected to this edge
+                    sink_port = source.port
+                    bitwidth = source.bit_width
+        elif (edge[1] in pmod.get_tiles()):
+            source_port = "in"
+            for source in pmod.sources[edge[1]]:
+                if source == edge[0]: # find the sink connected to this edge
+                    bitwidth = source.bit_width
+        else:
+            sink_port = "in"
+            bitwidth = edge[1].bit_width
+        g.add_edge(str(edge[0]), 
+                   str(edge[1]), 
+                   source_port=source_port, 
+                   sink_port = sink_port,
+                   bitwidth = bitwidth)
+        # breakpoint()
+    return g
+
+    # find if edge[0],[1] are tile or route nodes
+    
