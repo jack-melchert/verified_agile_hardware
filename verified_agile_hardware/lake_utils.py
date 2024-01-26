@@ -41,7 +41,7 @@ def get_mem_sram_var(solver, mem_name, sram_name="data_array"):
         if sram_name in str(sv) and mem_name in str(sv):
             sram_vars.append(sv)
 
-    assert len(sram_vars) == 1, f"Wrong number of SRAMs found: {len(sram_vars)}" 
+    assert len(sram_vars) == 1, f"Wrong number of SRAMs found: {len(sram_vars)}"
 
     return sram_vars[0]
 
@@ -52,20 +52,31 @@ def config_rom(solver, mem_name, rom_val):
     index_sort = sort.get_indexsort()
     element_sort = sort.get_elemsort()
 
-    rom_val = [8]*256
-    
+    rom_val = [11] * 256
+
     packed_rom_val = []
     for i in range(0, len(rom_val), 4):
         packed_rom_val.append(0)
         for j in range(4):
             if i + j >= len(rom_val):
                 break
-            packed_rom_val[i//4] = packed_rom_val[i//4] | (rom_val[i + j] << (j * 16))
+            packed_rom_val[i // 4] = packed_rom_val[i // 4] | (
+                rom_val[i + j] << (j * 16)
+            )
 
     for i, val in enumerate(packed_rom_val):
-        sram_var = solver.create_term(solver.ops.Store, sram_var, solver.create_term(i, index_sort), solver.create_term(val, element_sort))
+        sram_var = solver.create_term(
+            solver.ops.Store,
+            sram_var,
+            solver.create_term(i, index_sort),
+            solver.create_term(val, element_sort),
+        )
 
-    solver.fts.add_invar(solver.create_term(solver.ops.Equal, sram_var, get_mem_sram_var(solver, mem_name)))
+    solver.fts.add_invar(
+        solver.create_term(
+            solver.ops.Equal, sram_var, get_mem_sram_var(solver, mem_name)
+        )
+    )
 
 
 def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):

@@ -152,6 +152,7 @@ setundef -undriven -expose;
 
 # This writes to a file in BTOR2 format
 write_btor {btor_filename}            
+write_verilog {btor_filename}.v
     """
 
     run_yosys_script(script)

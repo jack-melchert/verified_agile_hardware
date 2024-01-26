@@ -104,6 +104,7 @@ def test_bmc_terms():
     assert res is not None
     assert not res
 
+
 def test_bmc_input_var():
     solver = Solver()
 

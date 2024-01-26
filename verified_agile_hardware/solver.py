@@ -20,7 +20,7 @@ class Solver:
         self.clks = []
         self.flushes = []
         self.num_memtiles = 0
-        self.first_valid_output = float('inf')
+        self.first_valid_output = float("inf")
 
         bvsort16 = self.solver.make_sort(ss.sortkinds.BV, 16)
         self.bmc_counter = self.fts.make_statevar("bmc_counter", bvsort16)

@@ -31,6 +31,29 @@ def coreir_to_pdf(nx_graph, filename):
     dot.render(filename)
 
 
+def port_remap_mem(mode, port, port_remap):
+    # Ugh these hacks are copied from garnet
+    if mode == "ROM":
+        hack_remap = {
+            "addr_in_0": "wr_addr_in",
+            "ren_in_0": "ren",
+            "data_out_0": "data_out",
+        }
+        assert port in hack_remap, f"Port {port} not in hack remap"
+        port = hack_remap[port]
+
+    if mode == "stencil_valid":
+        if "stencil_valid" in port:
+            port = port_remap["stencil_valid"][port]
+        elif port in port_remap["UB"]:
+            port = port_remap["UB"][port]
+    else:
+        if port in port_remap[mode]:
+            port = port_remap[mode][port]
+
+    return port
+
+
 def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
         for in_symbol in in_symbols:
@@ -81,6 +104,8 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         # This is hardcoded and will break if there are complex PE output types
         out_to_slice = {}
         curr_bit = 0
+
+        coreir_name_to_peak_name = {}
         for idx, (n, v) in enumerate(PE_fc.SMT.output_t._field_table_.items()):
             if issubclass(v, hwtypes.bit_vector.Bit):
                 size = 1
@@ -88,10 +113,22 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                 size = v.size
             out_to_slice[f"O{idx}"] = (curr_bit, curr_bit + size - 1)
             curr_bit += size
+            coreir_name_to_peak_name[n] = f"O{idx}"
+
+        port_remap = solver.interconnect.tile_circuits[(1, 1)].core.get_port_remap()[
+            "alu"
+        ]
+        port_remap_reversed = {v: k for k, v in port_remap.items()}
 
         for out_symbol in out_symbols:
             port = str(out_symbol).split(f"{data['inst'].name}.")[1]
-            start, end = out_to_slice[port]
+
+            if port in out_to_slice:
+                start, end = out_to_slice[port]
+            else:
+                start, end = out_to_slice[
+                    coreir_name_to_peak_name[port_remap_reversed[port]]
+                ]
 
             ext = ss.Op(ss.primops.Extract, end, start)
             ext_pe = solver.create_term(ext, pe0)
@@ -102,9 +139,13 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
     elif tile_type == "cgralib.Mem":
         mem_name = data["inst"].name
 
-        if "port_controller" in mem_name:
-            valid_out_starting_cycle = data["inst"].metadata["config"]["stencil_valid"]['cycle_starting_addr'][0]
-            solver.first_valid_output = min(solver.first_valid_output, valid_out_starting_cycle)
+        if "stencil_valid" in data["inst"].metadata["config"]:
+            valid_out_starting_cycle = data["inst"].metadata["config"]["stencil_valid"][
+                "cycle_starting_addr"
+            ][0]
+            solver.first_valid_output = min(
+                solver.first_valid_output, valid_out_starting_cycle
+            )
 
         # Need to configure memory here
         mem_tile = solver.interconnect.tile_circuits[(3, 1)].core
@@ -151,6 +192,15 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         )
         used_mem_inputs.append(mem_inputs[f"tile_en_{mem_name}"])
 
+        solver.fts.add_invar(
+            solver.create_term(
+                solver.ops.Equal,
+                mem_inputs[f"clk_en_{mem_name}"],
+                solver.create_const(1, solver.create_bvsort(1)),
+            )
+        )
+        used_mem_inputs.append(mem_inputs[f"clk_en_{mem_name}"])
+
         if mode == "ROM":
             mode_val = 2
         else:
@@ -179,27 +229,18 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         )
         used_mem_inputs.append(mem_inputs[f"mode_excl_{mem_name}"])
 
-        # Annoying port remapping stuff here
         port_remap = mem_tile.get_port_remap()
-
-        port_remap = port_remap[mode]
 
         for in_symbol in in_symbols:
             port = str(in_symbol).split(f"{data['inst'].name}.")[1]
-            # Ugh this hack is copied from garnet
-            if mode == "ROM":
-                hack_remap = {
-                    'addr_in_0': 'wr_addr_in',
-                    'ren_in_0': 'ren',
-                    'data_out_0': 'data_out'
-                }
-                assert port in hack_remap, f"Port {port} not in hack remap"
-                port = hack_remap[port]
 
-            if port in port_remap:
-                port = port_remap[port]
+            port = port_remap_mem(mode, port, port_remap)
 
             in_symbol_width = in_symbol.get_sort().get_width()
+
+            if f"{port}_{mem_name}" not in mem_inputs:
+                breakpoint()
+
             if (
                 in_symbol_width
                 == mem_inputs[f"{port}_{mem_name}"].get_sort().get_width()
@@ -234,17 +275,8 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
 
         for out_symbol in out_symbols:
             port = str(out_symbol).split(f"{data['inst'].name}.")[1]
-            # Ugh this hack is copied from garnet
-            if mode == "ROM":
-                hack_remap = {
-                    'addr_in_0': 'wr_addr_in',
-                    'ren_in_0': 'ren',
-                    'data_out_0': 'data_out'
-                }
-                assert port in hack_remap, f"Port {port} not in hack remap"
-                port = hack_remap[port]
-            if port in port_remap:
-                port = port_remap[port]
+
+            port = port_remap_mem(mode, port, port_remap)
 
             out_symbol_width = out_symbol.get_sort().get_width()
             if (
@@ -280,10 +312,14 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         # About to do something dumb
         # sort config by the first number of the tuple
         config = sorted(config, key=lambda x: x[0])
-        registers = solver.interconnect.tile_circuits[(0, 1)].additional_cores[0].registers
+        registers = (
+            solver.interconnect.tile_circuits[(0, 1)].additional_cores[0].registers
+        )
         # Sort config inputs by the key
         config_inputs = {
-            n.split(f"_{pond_name}")[0]: v for n, v in registers.items() if "CONFIG" in n
+            n.split(f"_{pond_name}")[0]: v
+            for n, v in registers.items()
+            if "CONFIG" in n
         }
         config_inputs = sorted(config_inputs.items(), key=lambda x: x[0])
 
@@ -314,7 +350,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
         # Annoying port remapping stuff here
         port_remap = pond_tile.get_port_remap()
 
-        port_remap = port_remap['pond']
+        port_remap = port_remap["pond"]
 
         for in_symbol in in_symbols:
             port = str(in_symbol).split(f"{data['inst'].name}.")[1]
