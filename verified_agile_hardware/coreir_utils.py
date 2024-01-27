@@ -31,8 +31,17 @@ def coreir_to_pdf(nx_graph, filename):
     dot.render(filename)
 
 
-def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
+def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
+                node_symbols_in, node_symbols_out):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
+        # check if is an input node
+        if "input" in node:
+            in_symbols_dict = {str(s) : s for s in in_symbols}
+            node_symbols_in.update(in_symbols_dict)
+        else:
+            out_symbols_dict = {str(s) : s for s in out_symbols}
+            node_symbols_out.update(out_symbols_dict)
+
         for in_symbol in in_symbols:
             for out_symbol in out_symbols:
                 solver.fts.add_invar(
@@ -52,9 +61,14 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
 
         pe_inputs = {str(i): i for i in pe_inputs}
 
+        port_remap = solver.interconnect.tile_circuits[(1, 1)].core.get_port_remap()['alu']
+        port_remap_reversed = {v: k for k, v in port_remap.items()}
+
         for in_symbol in in_symbols:
             port = str(in_symbol).split(f"{node}.")[1]
             width = in_symbol.get_sort().get_width()
+            if (f"{port}_{data['inst'].name}" not in pe_inputs):
+                port = port_remap_reversed[port]
             if width == 1:
                 new_in_symbol = solver.create_term(
                     solver.ops.Equal,
@@ -69,40 +83,21 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                     )
                 )
             else:
+                pe_input = pe_inputs[f"{port}_{data['inst'].name}"]
+                in_symbol_short = solver.fts.make_term(
+                    ss.Op(ss.primops.Extract, pe_input.get_sort().get_width() - 1, 0),
+                    in_symbol,
+                )
+
                 solver.fts.add_invar(
                     solver.create_term(
                         solver.ops.Equal,
-                        in_symbol,
-                        pe_inputs[f"{port}_{data['inst'].name}"],
+                        in_symbol_short,
+                        pe_input,
                     )
                 )
 
-        # # This is hardcoded and will break if there are complex PE output types
-        # out_to_slice = {}
-        # curr_bit = 0
-        # for idx, (n, v) in enumerate(PE_fc.SMT.output_t._field_table_.items()):
-        #     if issubclass(v, hwtypes.bit_vector.Bit):
-        #         size = 1
-        #     else:
-        #         size = v.size
-        #     out_to_slice[f"O{idx}"] = (curr_bit, curr_bit + size - 1)
-        #     curr_bit += size
 
-        # port_remap = solver.interconnect.tile_circuits[(1, 1)].core.get_port_remap()
-        # breakpoint()
-
-        # for out_symbol in out_symbols:
-        #     port = str(out_symbol).split(f"{node}.")[1]
-            
-        #     start, end = out_to_slice[port]
-
-        #     ext = ss.Op(ss.primops.Extract, end, start)
-        #     ext_pe = solver.create_term(ext, pe0)
-
-        #     solver.fts.add_invar(
-        #         solver.create_term(solver.ops.Equal, out_symbol, ext_pe)
-        #     )
-        
         # This is hardcoded and will break if there are complex PE output types
         out_to_slice = {}
         curr_bit = 0
@@ -116,9 +111,6 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
             out_to_slice[f"O{idx}"] = (curr_bit, curr_bit + size - 1)
             curr_bit += size
             coreir_name_to_peak_name[n] = f"O{idx}"
-
-        port_remap = solver.interconnect.tile_circuits[(1, 1)].core.get_port_remap()['alu']
-        port_remap_reversed = {v: k for k, v in port_remap.items()}
 
         for out_symbol in out_symbols:
             port = str(out_symbol).split(f"{node}.")[1]
@@ -144,13 +136,12 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                     ss.Op(ss.primops.Extract, ext_pe.get_sort().get_width() - 1, 0),
                     out_symbol,
                 )
-                try:
-                    solver.fts.add_invar(
-                        solver.create_term(
-                            solver.ops.Equal, out_symbol_short, ext_pe)
-                    )
-                except:
-                    breakpoint()
+                
+                solver.fts.add_invar(
+                    solver.create_term(
+                        solver.ops.Equal, out_symbol_short, ext_pe)
+                )
+                
 
     elif tile_type == "cgralib.Mem":
         mem_name = data["inst"].name
@@ -313,9 +304,12 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         solver.fts.add_invar(
             solver.create_term(solver.ops.Equal, out_symbols[0], const)
         )
-    else:
-        # raise NotImplementedError(f"Tile type {tile_type} not supported")
-        print("Ignore me")
+    else: # if it's a route node, do the same thing as for I/O nodes
+        for in_symbol in in_symbols:
+            for out_symbol in out_symbols:
+                solver.fts.add_invar(
+                    solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
+                )
 
 
 def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
@@ -330,6 +324,8 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
     solver.interconnect = interconnect
 
     node_symbols = {}
+    node_symbols["in"] = {}
+    node_symbols["out"] = {}
 
     for node, data in graph.nodes(data=True):
         symbols = {}
@@ -360,11 +356,13 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
                 node == "in" or node == "out" or data["node_type"] == "route"
             # ), "Only in and out nodes should not have an inst attribute"
             ), "Only route nodes should not have an inst attribute"
-            node_to_smt(solver, "route", in_symbols, out_symbols, data, node)
+            node_to_smt(solver, "route", in_symbols, out_symbols, data, node,
+                        node_symbols["in"], node_symbols["out"])
         else:
             tile_type = data["inst"].module.ref_name
-            print(node, " ", in_symbols, " ", out_symbols)
-            node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node)
+            # print(node, " ", in_symbols, " ", out_symbols)
+            node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
+                        node_symbols["in"], node_symbols["out"])
 
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
@@ -372,8 +370,10 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
         solver.fts.add_invar(
             solver.create_term(solver.ops.Equal, source_symbol, sink_symbol)
         )
-
-    return solver, node_symbols["in"], node_symbols["out"]
+    try:
+        return solver, node_symbols["in"], node_symbols["out"]
+    except:
+        breakpoint()
 
 
 def coreir_to_nx(cmod): # cmod = coreir file
@@ -481,7 +481,7 @@ def pnr_to_nx(pmod,cmod): # pmod = pnr file
                     sink_port = source.port
                     bitwidth = source.bit_width
         elif (edge[1] in pmod.get_tiles()):
-            source_port = "in"
+            sink_port = "in"
             for source in pmod.sources[edge[1]]:
                 if source == edge[0]: # find the sink connected to this edge
                     bitwidth = source.bit_width
