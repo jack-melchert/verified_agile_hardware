@@ -8,6 +8,8 @@ class Solver:
     def __init__(self, solver_name="cvc5"):
         self.fe_solver = fe.Solver(solver_name)
         self.solver = self.fe_solver.solver
+        self.solver.set_opt("incremental", "true")
+        self.solver.set_opt("produce-models", "true")
         self.convert = self.fe_solver.converter.convert
         self.fts = pono.FunctionalTransitionSystem(self.solver)
         self.ur = pono.Unroller(self.fts)

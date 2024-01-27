@@ -52,8 +52,7 @@ def config_rom(solver, mem_name, rom_val):
     index_sort = sort.get_indexsort()
     element_sort = sort.get_elemsort()
 
-    rom_val = [11] * 256
-
+ 
     packed_rom_val = []
     for i in range(0, len(rom_val), 4):
         packed_rom_val.append(0)

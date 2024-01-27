@@ -147,17 +147,20 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                 solver.first_valid_output, valid_out_starting_cycle
             )
 
+        metadata = data["inst"].metadata
         # Need to configure memory here
         mem_tile = solver.interconnect.tile_circuits[(3, 1)].core
         config = mem_tile.get_config_bitstream(data["inst"].metadata)
 
-        metadata = data["inst"].metadata
+
         mode = "UB"
         if "stencil_valid" in metadata["config"]:
             mode = "stencil_valid"
         elif "mode" in metadata and metadata["mode"] == "sram":
             mode = "ROM"
-
+            # ROM values embedded in config, we want to remove those
+            config = [c for c in config if len(c) == 2]
+        
         # About to do something dumb
         # sort config by the first number of the tuple
         config = sorted(config, key=lambda x: x[0])
@@ -236,10 +239,8 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
 
             port = port_remap_mem(mode, port, port_remap)
 
-            in_symbol_width = in_symbol.get_sort().get_width()
 
-            if f"{port}_{mem_name}" not in mem_inputs:
-                breakpoint()
+            in_symbol_width = in_symbol.get_sort().get_width()
 
             if (
                 in_symbol_width
@@ -260,6 +261,17 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data):
                 )
             )
             used_mem_inputs.append(mem_input)
+
+        # Need to tie wen to 0 for ROMs, this is usually handled in the connection box
+        # But we just have to emulate that behavior here
+        if mode == "ROM":
+            rom_wen_port = port_remap['ROM']['wen']
+            wen_port = mem_inputs[f"{rom_wen_port}_{mem_name}"]
+            solver.fts.add_invar(
+                solver.create_term(
+                    solver.ops.Equal, wen_port, solver.create_const(0, wen_port.get_sort())
+                )
+            )
 
         unused_mem_inputs = {
             k: v for k, v in mem_inputs.items() if v not in used_mem_inputs

@@ -64,7 +64,6 @@ def mem_tile_to_btor(
     btor_filename="mem_core.btor2",
 ):
     """Convert a memory tile to a BTOR2 file."""
-
     # Check if garnet_filename exists
     try:
         with open(garnet_filename, "r") as f:
