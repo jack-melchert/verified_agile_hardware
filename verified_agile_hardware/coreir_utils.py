@@ -31,15 +31,14 @@ def coreir_to_pdf(nx_graph, filename):
     dot.render(filename)
 
 
-def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
-                node_symbols_in, node_symbols_out):
+def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, node_symbols_in, node_symbols_out):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
         # check if is an input node
-        if "input" in node:
-            in_symbols_dict = {str(s) : s for s in in_symbols}
+        if ("node_name" in data and "input" in data["node_name"]):
+            in_symbols_dict = {str(s) : s for s in out_symbols}
             node_symbols_in.update(in_symbols_dict)
         else:
-            out_symbols_dict = {str(s) : s for s in out_symbols}
+            out_symbols_dict = {str(s) : s for s in in_symbols}
             node_symbols_out.update(out_symbols_dict)
 
         for in_symbol in in_symbols:
@@ -54,8 +53,9 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
             str(out_symbol).split(f"{node}.")[1]
             for out_symbol in out_symbols
         ]
+        pe_name = str(node)
         pe0, bboxes0, pe_inputs = load_pe_tile(
-            solver, PE_fc, pe_name=data["inst"].name, out_port_names=out_port_names
+            solver, PE_fc, pe_name=pe_name, out_port_names=out_port_names
         )
         solver.bboxes.update(bboxes0)
 
@@ -67,7 +67,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
         for in_symbol in in_symbols:
             port = str(in_symbol).split(f"{node}.")[1]
             width = in_symbol.get_sort().get_width()
-            if (f"{port}_{data['inst'].name}" not in pe_inputs):
+            if (f"{port}_{pe_name}" not in pe_inputs):
                 port = port_remap_reversed[port]
             if width == 1:
                 new_in_symbol = solver.create_term(
@@ -79,11 +79,11 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
                     solver.create_term(
                         solver.ops.Equal,
                         new_in_symbol,
-                        pe_inputs[f"{port}_{data['inst'].name}"],
+                        pe_inputs[f"{port}_{pe_name}"],
                     )
                 )
             else:
-                pe_input = pe_inputs[f"{port}_{data['inst'].name}"]
+                pe_input = pe_inputs[f"{port}_{pe_name}"]
                 in_symbol_short = solver.fts.make_term(
                     ss.Op(ss.primops.Extract, pe_input.get_sort().get_width() - 1, 0),
                     in_symbol,
@@ -160,6 +160,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
         }
         config_inputs = sorted(config_inputs.items(), key=lambda x: x[0])
 
+        mem_name = str(node)
         mem_inputs, mem_outputs = load_new_mem_tile(
             solver, mem_name, mem_tile, zip(config, config_inputs)
         )
@@ -280,7 +281,8 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
     elif tile_type == "cgralib.Pond":
         breakpoint()
     elif tile_type == "coreir.reg":
-        name = data["inst"].name
+        # name = data["inst"].name
+        name = str(node)
         reg_in = solver.create_fts_state_var(f"{name}.reg_in", in_symbols[0].get_sort())
         reg_val = solver.create_fts_state_var(
             f"{name}.reg_val", in_symbols[0].get_sort()
@@ -312,11 +314,12 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
                 )
 
 
-def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
-    solver = Solver()
-    solver.solver.set_opt("produce-models", "true")
-    solver.file_info = file_info
-    solver.app_dir = f"{app_dir}/verification"
+# def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
+def nx_to_smt(graph, interconnect, solver, app_dir=None):
+    # solver = Solver()
+    # solver.solver.set_opt("produce-models", "true")
+    # solver.file_info = file_info
+    # solver.app_dir = f"{app_dir}/verification"
 
     if not os.path.exists(solver.app_dir):
         os.mkdir(solver.app_dir)
@@ -351,6 +354,8 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
             out_symbols.append(symbols[name])
         node_symbols[node] = symbols
 
+        node_symbols_in = {}
+        node_symbols_out = {}
         if "inst" not in data:
             assert (
                 node == "in" or node == "out" or data["node_type"] == "route"
@@ -363,6 +368,9 @@ def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
             # print(node, " ", in_symbols, " ", out_symbols)
             node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node,
                         node_symbols["in"], node_symbols["out"])
+        # node_symbols["in"].update(node_symbols_in)
+        # node_symbols["out"].update(node_symbols_out)
+        
 
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
