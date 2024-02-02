@@ -52,7 +52,6 @@ def config_rom(solver, mem_name, rom_val):
     index_sort = sort.get_indexsort()
     element_sort = sort.get_elemsort()
 
- 
     packed_rom_val = []
     for i in range(0, len(rom_val), 4):
         packed_rom_val.append(0)
@@ -78,7 +77,7 @@ def config_rom(solver, mem_name, rom_val):
     )
 
 
-def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):
+def produce_configed_memtile_verilog(app_dir, mem_tile, configs, mem_name):
     config_dict = {c1[0]: (c0[1], c1[1].width) for c0, c1 in configs}
 
     # I cant get kratos to behave so I'll codegen raw verilog
@@ -130,13 +129,13 @@ def produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name):
     verilog += ");\n"
     verilog += "endmodule\n"
 
-    with open(f"{solver.app_dir}/{mem_name}_configed.sv", "w") as f:
+    with open(f"{app_dir}/{mem_name}_configed.sv", "w") as f:
         f.write(verilog)
 
 
 def load_new_mem_tile(solver, mem_name, mem_tile, configs):
     # Write kratos configs to configure mem tile
-    produce_configed_memtile_verilog(solver, mem_tile, configs, mem_name)
+    produce_configed_memtile_verilog(solver.app_dir, mem_tile, configs, mem_name)
 
     unique = solver.num_memtiles + 12345
     solver.num_memtiles += 1

@@ -54,8 +54,8 @@ def test_pe_to_pono():
 
 def test_lassen_to_pono():
     solver = Solver()
-    pe0, bboxes0 = load_pe_tile(solver, lassen_fc, pe_name="pe0")
-    pe1, bboxes1 = load_pe_tile(solver, lassen_fc, pe_name="pe1")
+    pe0, bboxes0, _ = load_pe_tile(solver, lassen_fc, pe_name="pe0")
+    pe1, bboxes1, _ = load_pe_tile(solver, lassen_fc, pe_name="pe1")
 
     solver.assert_formula(solver.ur.at_time(solver.fts.init, 0))
 

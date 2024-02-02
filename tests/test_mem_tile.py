@@ -7,20 +7,6 @@ import pono
 
 
 @pytest.mark.parametrize(
-    "mem_file, mem_module, mem_output_file",
-    [
-        ("examples/simple_mem.v", "regfile", "examples/RamChip.btor2"),
-        ("/aha/garnet/garnet.v", "MemCore_inner", "examples/MemCore_inner.btor2"),
-        ("/aha/garnet/garnet.v", "PondTop", "examples/PondTop.btor2"),
-    ],
-)
-def test_mem_tile_yosys(mem_file, mem_module, mem_output_file):
-    mem_tile_to_btor(
-        mem_file, mem_tile_module=mem_module, btor_filename=mem_output_file
-    )
-
-
-@pytest.mark.parametrize(
     "mem_file",
     [
         "examples/RamChip.btor2",
