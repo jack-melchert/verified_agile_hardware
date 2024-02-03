@@ -18,12 +18,8 @@ cd $sdir/../deps
 git clone https://github.com/YosysHQ/yosys.git
 cd yosys
 
-if ! command -v sudo &> /dev/null
-then
-	make config-gcc
-	make -j
-fi
-	sudo make config-gcc
-	sudo make -j
+make config-gcc
+make -j4
+
 cp yosys /usr/local/bin
 cd $dir
