@@ -1,3 +1,4 @@
+dirpwd=$(pwd)
 if ! command -v sudo &> /dev/null
 then
     apt install build-essential clang bison flex \
@@ -10,7 +11,6 @@ fi
 	graphviz xdot pkg-config python3 libboost-system-dev \
 	libboost-python-dev libboost-filesystem-dev zlib1g-dev -y
 
-dir=$pwd
 sdir=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 mkdir -p cd $sdir/../deps
 cd $sdir/../deps
@@ -22,4 +22,4 @@ make config-gcc
 make -j4
 
 cp yosys /usr/local/bin
-cd $dir
+cd $dirpwd
