@@ -32,4 +32,4 @@ jobs:
         source scripts/setup_yosys.sh
     - name: Test with pytest
       run: |
-        pytest
+        pytest tests/
