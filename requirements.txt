@@ -2,5 +2,5 @@ networkx
 coreir
 simple-colors
 -e git+https://github.com/phanrahan/peak.git#egg=peak
--e git+https://github.com/stanford-centaur/smt-switch
--e git+https://github.com/stanford-centaur/pono
+-e git+https://github.com/stanford-centaur/smt-switch#egg=smt-switch
+-e git+https://github.com/stanford-centaur/pono#egg=pono
