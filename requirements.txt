@@ -1,5 +1,6 @@
 networkx
 coreir
 smt-switch
+pono
 simple-colors
 -e git+https://github.com/phanrahan/peak.git#egg=peak
