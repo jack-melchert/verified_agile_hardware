@@ -1,18 +1,23 @@
 pip install Cython==0.29 pytest toml scikit-build==0.13.0
-
 if ! command -v sudo &> /dev/null
 then
     apt-get update && apt-get install -y flex
 fi
     sudo apt-get update && apt-get install -y flex
-    
+
+dirpwd=$(pwd)
+
+sdir=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+mkdir -p cd $sdir/../deps
+cd $sdir/../deps
+
+git clone https://github.com/stanford-centaur/pono
+cd pono
+
 ./contrib/setup-bison.sh
-./scripts/setup-smt-switch.sh --python
 ./contrib/setup-btor2tools.sh
 
-cd /aha/pono && ./configure.sh --python && \
-cd /aha/pono/build && make -j4 && pip install -e ./python && \
-cd /aha && \
-source /aha/bin/activate && \
-pip install -e ./pono/deps/smt-switch/build/python && \
-pip install -e pono/build/python/
+./configure.sh --python 
+cd build && make -j4 && pip install -e ./python 
+
+cd $dirpwd
