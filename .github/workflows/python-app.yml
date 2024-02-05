@@ -30,7 +30,8 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         source scripts/setup_sv2v.sh
         source scripts/setup_yosys.sh
-        bash scripts/setup-smt-switch.sh --python
+        bash scripts/setup_smt_switch.sh --python
+        bash scripts/setup_pono.sh
         pip install -e .
     - name: Test with pytest
       run: |
