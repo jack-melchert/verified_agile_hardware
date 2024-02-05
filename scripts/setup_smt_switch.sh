@@ -5,6 +5,13 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DEPS=$DIR/../deps
 
+pip install Cython==0.29 pytest toml scikit-build==0.13.0
+if ! command -v sudo &> /dev/null
+then
+    apt-get update && apt-get install -y flex
+fi
+    sudo apt-get update && apt-get install -y flex
+
 SMT_SWITCH_VERSION=f2d7d3d6dfccc0b4d6b604563acd34629bac884d
 
 usage () {
