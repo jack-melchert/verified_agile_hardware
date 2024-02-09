@@ -31,6 +31,7 @@ jobs:
         source scripts/setup_sv2v.sh
         source scripts/setup_yosys.sh
         python -m pip install toml
+        python -m pip install scikit-build
         bash scripts/setup_smt_switch.sh --python
         bash scripts/setup_pono.sh
         pip install -e .
