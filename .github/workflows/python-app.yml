@@ -30,8 +30,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         source scripts/setup_sv2v.sh
         source scripts/setup_yosys.sh
-        python -m pip install toml
-        python -m pip install scikit-build
+        python -m pip install Cython==0.29 pytest toml scikit-build==0.13.0
         bash scripts/setup_smt_switch.sh --python
         bash scripts/setup_pono.sh
         pip install -e .
