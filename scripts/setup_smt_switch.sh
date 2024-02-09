@@ -60,15 +60,12 @@ done
 
 mkdir -p $DEPS
 
-pip install Cython==0.29 pytest toml scikit-build==0.13.0
-
 if [ ! -d "$DEPS/smt-switch" ]; then
     cd $DEPS
     git clone https://github.com/makaimann/smt-switch
     cd smt-switch
     git checkout -f $SMT_SWITCH_VERSION
 
-    pip install Cython==0.29 pytest toml scikit-build==0.13.0
     if ! command -v sudo &> /dev/null
     then
         apt-get update && apt-get install -y flex
@@ -86,6 +83,7 @@ if [ ! -d "$DEPS/smt-switch" ]; then
     make -j$(nproc)
     make test
     make install
+    pip install -e ./python 
     cd $DIR
 else
     echo "$DEPS/smt-switch already exists. If you want to rebuild, please remove it manually."
