@@ -60,6 +60,8 @@ done
 
 mkdir -p $DEPS
 
+pip install Cython==0.29 pytest toml scikit-build==0.13.0
+
 if [ ! -d "$DEPS/smt-switch" ]; then
     cd $DEPS
     git clone https://github.com/makaimann/smt-switch
