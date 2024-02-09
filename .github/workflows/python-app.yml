@@ -30,7 +30,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         source scripts/setup_sv2v.sh
         source scripts/setup_yosys.sh
-        /home/runner/work/verified_agile_hardware/verified_agile_hardware/venv/bin/python3 -m pip install toml
+        python -m pip install toml
         bash scripts/setup_smt_switch.sh --python
         bash scripts/setup_pono.sh
         pip install -e .
