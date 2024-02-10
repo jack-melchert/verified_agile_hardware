@@ -31,8 +31,8 @@ jobs:
         source scripts/setup_sv2v.sh
         source scripts/setup_yosys.sh
         python -m pip install Cython==0.29 pytest toml scikit-build==0.13.0
-        bash scripts/setup_smt_switch.sh --python
-        bash scripts/setup_pono.sh
+        source scripts/setup_smt_switch.sh --python
+        source scripts/setup_pono.sh
         pip install -e .
     - name: Test with pytest
       run: |
