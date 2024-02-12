@@ -3,7 +3,7 @@ if ! command -v sudo &> /dev/null
 then
     apt-get update && apt-get install -y flex
 fi
-    sudo apt-get update && apt-get install -y flex
+    sudo apt-get update && sudo apt-get install -y flex
 
 dirpwd=$(pwd)
 
