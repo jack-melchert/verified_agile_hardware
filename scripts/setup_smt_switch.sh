@@ -70,7 +70,7 @@ if [ ! -d "$DEPS/smt-switch" ]; then
     then
         apt-get update && apt-get install -y flex
     fi
-        sudo apt-get update && apt-get install -y flex
+        sudo apt-get update && sudo apt-get install -y flex
    
     ./contrib/setup-btor.sh
     ./contrib/setup-bitwuzla.sh
