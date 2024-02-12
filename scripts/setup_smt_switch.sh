@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Copied from pono/contrib/setup-smt-switch.sh
-
+dirpwd=$(pwd)
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DEPS=$DIR/../deps
 
@@ -98,3 +98,5 @@ else
     echo "Please see the github page for installation instructions: https://github.com/makaimann/smt-switch"
     exit 1
 fi
+
+cd $dirpwd
