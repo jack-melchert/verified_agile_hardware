@@ -1,9 +1,8 @@
-pip install Cython==0.29 pytest toml scikit-build==0.13.0
 if ! command -v sudo &> /dev/null
 then
     apt-get update && apt-get install -y flex
 fi
-    sudo apt-get update && sudo apt-get install -y flex
+    sudo apt-get update && sudo apt-get install -y flex && sudo apt-get install -y m4
 
 dirpwd=$(pwd)
 
@@ -15,6 +14,7 @@ git clone https://github.com/stanford-centaur/pono
 cd pono
 
 ./contrib/setup-bison.sh
+./contrib/setup-flex.sh
 ./contrib/setup-btor2tools.sh
 
 ./configure.sh --python 
