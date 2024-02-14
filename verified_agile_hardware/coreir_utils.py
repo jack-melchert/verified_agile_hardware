@@ -277,7 +277,7 @@ def node_to_smt(
         port_remap = mem_tile.get_port_remap()
 
         for in_symbol in in_symbols:
-            port = str(in_symbol).split(f"{data['inst'].name}.")[1]
+            port = str(in_symbol).split(f"{mem_name}.")[1]
 
             port = port_remap_mem(mode, port, port_remap)
 
@@ -329,7 +329,7 @@ def node_to_smt(
                 )
 
         for out_symbol in out_symbols:
-            port = str(out_symbol).split(f"{data['inst'].name}.")[1]
+            port = str(out_symbol).split(f"{mem_name}.")[1]
 
             port = port_remap_mem(mode, port, port_remap)
 
