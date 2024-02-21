@@ -19,20 +19,20 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Python 3.10
+    - name: Set up Python
       uses: actions/setup-python@v3
       with:
         python-version: "3.8"
     - name: Install dependencies
       run: |
+        python -m pip install Cython==0.29 pytest toml scikit-build==0.13.0
+        source scripts/setup_smt_switch.sh --python
+        source scripts/setup_pono.sh
         python -m pip install --upgrade pip
         pip install pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         source scripts/setup_sv2v.sh
         source scripts/setup_yosys.sh
-        python -m pip install Cython==0.29 pytest toml scikit-build==0.13.0
-        source scripts/setup_smt_switch.sh --python
-        source scripts/setup_pono.sh
         pip install -e .
     - name: Test with pytest
       run: |
