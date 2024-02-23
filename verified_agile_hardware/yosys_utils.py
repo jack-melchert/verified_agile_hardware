@@ -90,11 +90,11 @@ def mem_tile_to_btor(
     except FileNotFoundError:
         sv2v(garnet_filename, sv2v_garnet_filename)
 
-    try:
-        with open(sv2v_memtile_filename, "r") as f:
-            pass
-    except FileNotFoundError:
-        sv2v(memtile_filename, sv2v_memtile_filename)
+    # try:
+    #     with open(sv2v_memtile_filename, "r") as f:
+    #         pass
+    # except FileNotFoundError:
+    sv2v(memtile_filename, sv2v_memtile_filename)
 
     script = f"""
 # read in the file(s) -- there can be multiple
@@ -119,10 +119,10 @@ chformal -assume -early;
 
 # this processes memories
 # nomap means it will keep them as arrays
-memory -nomap;
+memory -nomap; opt;
 
 # flatten the design hierarchy
-flatten;
+flatten; opt;
 
 # (optional) uncomment and set values to simulate reset signal
 # use -resetn for an active low pin
@@ -144,7 +144,7 @@ opt;
 
 # This turns all undriven signals into
 # inputs
-setundef -undriven -expose;
+setundef -undriven -expose; opt;
 
 
 #write_rtlil

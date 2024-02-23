@@ -212,9 +212,30 @@ def node_to_smt(
         }
         config_inputs = sorted(config_inputs.items(), key=lambda x: x[0])
 
+        config_dict = {c1[0]: c0[1] for c0, c1 in zip(config, config_inputs)}
+
+        config_dict["tile_en"] = 1
+        config_dict["clk_en"] = 1
+
+        if mode == "ROM":
+            mode_val = 2
+            mode_excl_val = 0
+        else:
+            mode_val = 1
+            mode_excl_val = 1
+
+        config_dict["mode"] = mode_val
+        config_dict["mode_excl"] = mode_excl_val
+
+        config_dict["config_addr_in"] = 0
+        config_dict["config_data_in"] = 0
+        config_dict["config_en"] = 0
+        config_dict["config_read"] = 0
+        config_dict["config_write"] = 0
+
         mem_name = str(node)
         mem_inputs, mem_outputs = load_new_mem_tile(
-            solver, mem_name, mem_tile, zip(config, config_inputs)
+            solver, mem_name, mem_tile, config_dict
         )
 
         used_mem_inputs = []
@@ -227,61 +248,18 @@ def node_to_smt(
         solver.flushes.append(mem_inputs[f"flush_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"flush_{mem_name}"])
 
-        # tile_en, mode, and config signals, going to hardcode these
-        solver.fts.add_invar(
-            solver.create_term(
-                solver.ops.Equal,
-                mem_inputs[f"tile_en_{mem_name}"],
-                solver.create_const(1, solver.create_bvsort(1)),
-            )
-        )
-        used_mem_inputs.append(mem_inputs[f"tile_en_{mem_name}"])
-
-        solver.fts.add_invar(
-            solver.create_term(
-                solver.ops.Equal,
-                mem_inputs[f"clk_en_{mem_name}"],
-                solver.create_const(1, solver.create_bvsort(1)),
-            )
-        )
-        used_mem_inputs.append(mem_inputs[f"clk_en_{mem_name}"])
-
-        if mode == "ROM":
-            mode_val = 2
-        else:
-            mode_val = 1
-
-        solver.fts.add_invar(
-            solver.create_term(
-                solver.ops.Equal,
-                mem_inputs[f"mode_{mem_name}"],
-                solver.create_const(mode_val, solver.create_bvsort(2)),
-            )
-        )
-        used_mem_inputs.append(mem_inputs[f"mode_{mem_name}"])
-
-        if mode == "ROM":
-            mode_excl_val = 0
-        else:
-            mode_excl_val = 1
-
-        solver.fts.add_invar(
-            solver.create_term(
-                solver.ops.Equal,
-                mem_inputs[f"mode_excl_{mem_name}"],
-                solver.create_const(mode_excl_val, solver.create_bvsort(1)),
-            )
-        )
-        used_mem_inputs.append(mem_inputs[f"mode_excl_{mem_name}"])
-
         port_remap = mem_tile.get_port_remap()
 
         for in_symbol in in_symbols:
             port = str(in_symbol).split(f"{mem_name}.")[1]
 
+            # Need to fix this for verify-pnr
             port = port_remap_mem(mode, port, port_remap)
 
             in_symbol_width = in_symbol.get_sort().get_width()
+
+            if f"{port}_{mem_name}" not in mem_inputs:
+                continue
 
             if (
                 in_symbol_width
@@ -392,7 +370,6 @@ def node_to_smt(
         solver.flushes.append(pond_inputs[f"flush_{pond_name}"])
         used_pond_inputs.append(pond_inputs[f"flush_{pond_name}"])
 
-        # tile_en, mode, and config signals, going to hardcode these
         solver.fts.add_invar(
             solver.create_term(
                 solver.ops.Equal,

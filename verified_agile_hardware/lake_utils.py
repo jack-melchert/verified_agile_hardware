@@ -77,8 +77,7 @@ def config_rom(solver, mem_name, rom_val):
     )
 
 
-def produce_configed_memtile_verilog(app_dir, mem_tile, configs, mem_name):
-    config_dict = {c1[0]: (c0[1], c1[1].width) for c0, c1 in configs}
+def produce_configed_memtile_verilog(app_dir, mem_tile, config_dict, mem_name):
 
     # I cant get kratos to behave so I'll codegen raw verilog
     inputs_and_bw = []
@@ -119,7 +118,7 @@ def produce_configed_memtile_verilog(app_dir, mem_tile, configs, mem_name):
 
     for in_, bw, packed, size in inputs_and_bw:
         if in_ in config_dict:
-            verilog += f".{in_}({config_dict[in_][1]}'d{config_dict[in_][0]}),\n"
+            verilog += f".{in_}({bw}'d{config_dict[in_]}),\n"
         else:
             verilog += f".{in_}({in_}_{mem_name}),\n"
 
@@ -133,11 +132,11 @@ def produce_configed_memtile_verilog(app_dir, mem_tile, configs, mem_name):
         f.write(verilog)
 
 
-def load_new_mem_tile(solver, mem_name, mem_tile, configs):
-    # Write kratos configs to configure mem tile
-    produce_configed_memtile_verilog(solver.app_dir, mem_tile, configs, mem_name)
+def load_new_mem_tile(solver, mem_name, mem_tile, config_dict):
+    # Write kratos config_dict to configure mem tile
+    produce_configed_memtile_verilog(solver.app_dir, mem_tile, config_dict, mem_name)
 
-    unique = solver.num_memtiles + 12345
+    unique = solver.num_memtiles + 12345  # this is stupid
     solver.num_memtiles += 1
 
     btor_file_t = f"{solver.app_dir}/{mem_name}_configed_temp.btor"
