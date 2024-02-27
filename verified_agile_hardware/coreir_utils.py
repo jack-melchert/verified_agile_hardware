@@ -202,6 +202,9 @@ def node_to_smt(
             # ROM values embedded in config, we want to remove those
             config = [c for c in config if len(c) == 2]
 
+        mem_name = str(node)
+        port_remap = mem_tile.get_port_remap()
+
         # About to do something dumb
         # sort config by the first number of the tuple
         config = sorted(config, key=lambda x: x[0])
@@ -233,9 +236,17 @@ def node_to_smt(
         config_dict["config_read"] = 0
         config_dict["config_write"] = 0
 
-        mem_name = str(node)
+
+        # config_dict["flush"] = 0
+        # config_dict["rst_n"] = 1
+
+
+        used_inputs = [port_remap_mem(mode, str(in_symbol).split(f"{mem_name}.")[1], port_remap) for in_symbol in in_symbols]
+        used_outputs = [port_remap_mem(mode, str(out_symbol).split(f"{mem_name}.")[1], port_remap) for out_symbol in out_symbols]
+
+
         mem_inputs, mem_outputs = load_new_mem_tile(
-            solver, mem_name, mem_tile, config_dict
+            solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
         )
 
         used_mem_inputs = []
@@ -248,7 +259,6 @@ def node_to_smt(
         solver.flushes.append(mem_inputs[f"flush_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"flush_{mem_name}"])
 
-        port_remap = mem_tile.get_port_remap()
 
         for in_symbol in in_symbols:
             port = str(in_symbol).split(f"{mem_name}.")[1]

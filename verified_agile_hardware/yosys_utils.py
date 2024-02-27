@@ -119,10 +119,10 @@ chformal -assume -early;
 
 # this processes memories
 # nomap means it will keep them as arrays
-memory -nomap; opt;
+memory -nomap; opt -full;
 
 # flatten the design hierarchy
-flatten; opt;
+flatten; opt -full;
 
 # (optional) uncomment and set values to simulate reset signal
 # use -resetn for an active low pin
@@ -140,11 +140,13 @@ flatten; opt;
 # IMPORTANT NOTE: the clocks are not
 # automatically toggled if you use this option
 clk2fflogic;
-opt;
+opt -full;
+
+clean -purge;
 
 # This turns all undriven signals into
 # inputs
-setundef -undriven -expose; opt;
+setundef -undriven -expose; opt -full;
 
 
 #write_rtlil

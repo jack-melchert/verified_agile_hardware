@@ -77,7 +77,10 @@ def config_rom(solver, mem_name, rom_val):
     )
 
 
-def produce_configed_memtile_verilog(app_dir, mem_tile, config_dict, mem_name):
+def produce_configed_memtile_verilog(app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs):
+
+    # always used
+    used_inputs += ["clk", "flush", "rst_n"]
 
     # I cant get kratos to behave so I'll codegen raw verilog
     inputs_and_bw = []
@@ -97,7 +100,7 @@ def produce_configed_memtile_verilog(app_dir, mem_tile, config_dict, mem_name):
     verilog = f"""module {mem_name} (\n"""
 
     for in_, bw, packed, size in inputs_and_bw:
-        if in_ in config_dict:
+        if in_ in config_dict or in_ not in used_inputs:
             continue
         in_ += f"_{mem_name}"
         if packed:
@@ -105,14 +108,34 @@ def produce_configed_memtile_verilog(app_dir, mem_tile, config_dict, mem_name):
         else:
             verilog += f"input wire [{bw-1}:0] {in_},\n"
 
-    for in_, bw, packed, size in outputs_and_bw:
-        in_ += f"_{mem_name}"
+    for out_, bw, packed, size in outputs_and_bw:
+        if out_ not in used_outputs:
+            continue
+        out_ += f"_{mem_name}"
         if packed:
-            verilog += f"output wire [{size-1}:0] [{bw-1}:0] {in_},\n"
+            verilog += f"output wire [{size-1}:0] [{bw-1}:0] {out_},\n"
         else:
-            verilog += f"output wire [{bw-1}:0] {in_},\n"
+            verilog += f"output wire [{bw-1}:0] {out_},\n"
 
     verilog += ");\n"
+
+    for in_, bw, packed, size in inputs_and_bw:
+        if in_ in config_dict or in_ in used_inputs:
+            continue
+        in_ += f"_{mem_name}"
+        if packed:
+            verilog += f"wire [{size-1}:0] [{bw-1}:0] {in_};\n"
+        else:
+            verilog += f"wire [{bw-1}:0] {in_};\n"
+
+    for out_, bw, packed, size in outputs_and_bw:
+        if out_ in used_outputs:
+            continue
+        out_ += f"_{mem_name}"
+        if packed:
+            verilog += f"wire [{size-1}:0] [{bw-1}:0] {out_};\n"
+        else:
+            verilog += f"wire [{bw-1}:0] {out_};\n"
 
     verilog += f"{mem_tile.dut.name} {mem_tile.dut.name}_{mem_name} (\n"
 
@@ -131,10 +154,9 @@ def produce_configed_memtile_verilog(app_dir, mem_tile, config_dict, mem_name):
     with open(f"{app_dir}/{mem_name}_configed.sv", "w") as f:
         f.write(verilog)
 
-
-def load_new_mem_tile(solver, mem_name, mem_tile, config_dict):
+def load_new_mem_tile(solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs):
     # Write kratos config_dict to configure mem tile
-    produce_configed_memtile_verilog(solver.app_dir, mem_tile, config_dict, mem_name)
+    produce_configed_memtile_verilog(solver.app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs)
 
     unique = solver.num_memtiles + 12345  # this is stupid
     solver.num_memtiles += 1
