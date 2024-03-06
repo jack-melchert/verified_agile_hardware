@@ -77,7 +77,9 @@ def config_rom(solver, mem_name, rom_val):
     )
 
 
-def produce_configed_memtile_verilog(app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs):
+def produce_configed_memtile_verilog(
+    app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs
+):
 
     # always used
     used_inputs += ["clk", "flush", "rst_n"]
@@ -154,9 +156,14 @@ def produce_configed_memtile_verilog(app_dir, mem_tile, config_dict, mem_name, u
     with open(f"{app_dir}/{mem_name}_configed.sv", "w") as f:
         f.write(verilog)
 
-def load_new_mem_tile(solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs):
+
+def load_new_mem_tile(
+    solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
+):
     # Write kratos config_dict to configure mem tile
-    produce_configed_memtile_verilog(solver.app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs)
+    produce_configed_memtile_verilog(
+        solver.app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs
+    )
 
     unique = solver.num_memtiles + 12345  # this is stupid
     solver.num_memtiles += 1
@@ -210,3 +217,24 @@ def load_new_mem_tile(solver, mem_name, mem_tile, config_dict, used_inputs, used
     mem_inputs = get_mem_inputs(solver, mem_name)
 
     return mem_inputs, get_mem_btor_outputs(solver, btor_file)
+
+
+def constrain_cycle_starting_addr(solver, mem_name, metadata):
+
+    cycle_starting_addrs = {}
+
+    for controller, config in metadata["config"].items():
+        cycle_starting_addrs[controller] = config["cycle_starting_addr"][0]
+
+    for name, term in solver.fts.named_terms.items():
+        if "addr_out" in name and mem_name in name:
+            for controller, addr in cycle_starting_addrs.items():
+                if controller in name:
+                    solver.fts.constrain_init(
+                        solver.create_term(
+                            solver.ops.Equal,
+                            term,
+                            solver.create_const(addr, term.get_sort()),
+                        )
+                    )
+                    print(f"Constraining {name} to {addr}")

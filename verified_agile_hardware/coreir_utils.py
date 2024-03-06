@@ -14,7 +14,11 @@ from verified_agile_hardware.peak_utils import (
     get_pe_inputs,
     get_pe_state,
 )
-from verified_agile_hardware.lake_utils import load_new_mem_tile, config_rom
+from verified_agile_hardware.lake_utils import (
+    load_new_mem_tile,
+    config_rom,
+    constrain_cycle_starting_addr,
+)
 
 
 def coreir_to_pdf(nx_graph, filename):
@@ -236,29 +240,33 @@ def node_to_smt(
         config_dict["config_read"] = 0
         config_dict["config_write"] = 0
 
-
         # config_dict["flush"] = 0
-        # config_dict["rst_n"] = 1
+        config_dict["rst_n"] = 1
 
-
-        used_inputs = [port_remap_mem(mode, str(in_symbol).split(f"{mem_name}.")[1], port_remap) for in_symbol in in_symbols]
-        used_outputs = [port_remap_mem(mode, str(out_symbol).split(f"{mem_name}.")[1], port_remap) for out_symbol in out_symbols]
-
+        used_inputs = [
+            port_remap_mem(mode, str(in_symbol).split(f"{mem_name}.")[1], port_remap)
+            for in_symbol in in_symbols
+        ]
+        used_outputs = [
+            port_remap_mem(mode, str(out_symbol).split(f"{mem_name}.")[1], port_remap)
+            for out_symbol in out_symbols
+        ]
 
         mem_inputs, mem_outputs = load_new_mem_tile(
             solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
         )
 
+        constrain_cycle_starting_addr(solver, mem_name, metadata)
+
         used_mem_inputs = []
 
         # Reset, clock, and flush
-        solver.rsts.append(mem_inputs[f"rst_n_{mem_name}"])
-        used_mem_inputs.append(mem_inputs[f"rst_n_{mem_name}"])
+        # solver.rsts.append(mem_inputs[f"rst_n_{mem_name}"])
+        # used_mem_inputs.append(mem_inputs[f"rst_n_{mem_name}"])
         solver.clks.append(mem_inputs[f"clk_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"clk_{mem_name}"])
         solver.flushes.append(mem_inputs[f"flush_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"flush_{mem_name}"])
-
 
         for in_symbol in in_symbols:
             port = str(in_symbol).split(f"{mem_name}.")[1]
