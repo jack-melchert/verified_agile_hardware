@@ -189,6 +189,7 @@ def node_to_smt(
             valid_out_starting_cycle = data["inst"].metadata["config"]["stencil_valid"][
                 "cycle_starting_addr"
             ][0]
+            solver.stencil_valid_to_cycle_starting_addr[str(node)] = valid_out_starting_cycle
             solver.first_valid_output = min(
                 solver.first_valid_output, valid_out_starting_cycle
             )
