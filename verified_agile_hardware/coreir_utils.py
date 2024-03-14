@@ -18,6 +18,7 @@ from verified_agile_hardware.lake_utils import (
     load_new_mem_tile,
     config_rom,
     constrain_cycle_starting_addr,
+    mem_tile_constraint_generator,
 )
 
 
@@ -189,7 +190,9 @@ def node_to_smt(
             valid_out_starting_cycle = data["inst"].metadata["config"]["stencil_valid"][
                 "cycle_starting_addr"
             ][0]
-            solver.stencil_valid_to_cycle_starting_addr[str(node)] = valid_out_starting_cycle
+            solver.stencil_valid_to_cycle_starting_addr[str(node)] = (
+                valid_out_starting_cycle
+            )
             solver.first_valid_output = min(
                 solver.first_valid_output, valid_out_starting_cycle
             )
@@ -257,7 +260,9 @@ def node_to_smt(
             solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
         )
 
-        # constrain_cycle_starting_addr(solver, mem_name, metadata)
+        mem_tile_constraint_generator(
+            solver, mem_name, metadata, 4096, iterator_support=6
+        )
 
         used_mem_inputs = []
 
@@ -512,10 +517,16 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
     stencil_valid_to_port_controller = {}
 
     for node, data in graph.nodes(data=True):
-        if "port_controller" in str(node) and 'inst' in data and data['inst'].module.name == "Mem":
+        if (
+            "port_controller" in str(node)
+            and "inst" in data
+            and data["inst"].module.name == "Mem"
+        ):
             curr_node = node
             while len(graph.out_edges(curr_node)) != 0:
-                assert len(graph.out_edges(curr_node)) == 1, f"Port controller {node} has more than one output"
+                assert (
+                    len(graph.out_edges(curr_node)) == 1
+                ), f"Port controller {node} has more than one output"
                 prev_node = curr_node
                 for edge in graph.out_edges(curr_node):
                     curr_node = edge[1]
@@ -586,7 +597,6 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
         # node_symbols["in"].update(node_symbols_in)
         # node_symbols["out"].update(node_symbols_out)
 
-
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
         sink_symbol = node_symbols[sink][f'{sink}.{data["sink_port"]}']
@@ -594,7 +604,6 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
             solver.create_term(solver.ops.Equal, source_symbol, sink_symbol)
         )
     return solver, node_symbols["in"], node_symbols["out"]
-
 
 
 def coreir_to_nx(cmod):  # cmod = coreir file

@@ -2,10 +2,12 @@ from verified_agile_hardware.solver import Solver, Rewriter
 from verified_agile_hardware.yosys_utils import mem_tile_to_btor
 from verified_agile_hardware.configure_mem_tile import MemtileConfig
 from _kratos import create_wrapper_flatten
+from lake.models.addr_gen_model import AddrGenModel
 import os
 import magma
 import kratos as kts
 import json
+import smt_switch as ss
 
 
 def get_mem_btor_outputs(solver, btor_filename):
@@ -238,3 +240,111 @@ def constrain_cycle_starting_addr(solver, mem_name, metadata):
                         )
                     )
                     print(f"Constraining {name} to {addr}")
+
+
+def mem_tile_constraint_generator(
+    solver, memtile_name, config_dict, cycles, iterator_support=2
+):
+
+    for controller, config in config_dict["config"].items():
+        addr_out, dim_out = mem_tile_addr_dim_values(config, cycles, iterator_support)
+        for name, term in solver.fts.named_terms.items():
+            if (
+                "addr_out" in name
+                and memtile_name in name
+                and controller in name
+                and not solver.fts.is_next_var(term)
+            ):
+                addr_out_type = term.get_sort()
+
+                # Create LUT for addr_out and dim_out
+                addr_out_var = solver.create_fts_state_var(
+                    f"{memtile_name}_address_out",
+                    solver.solver.make_sort(
+                        ss.sortkinds.ARRAY, solver.create_bvsort(16), addr_out_type
+                    ),
+                )
+
+                for i, addr in enumerate(addr_out):
+                    addr_out_var = solver.create_term(
+                        solver.ops.Store,
+                        addr_out_var,
+                        solver.create_const(i, solver.create_bvsort(16)),
+                        solver.create_const(addr, addr_out_type),
+                    )
+
+                starting_addr = solver.create_term(
+                    solver.ops.Select, addr_out_var, solver.cycle_count
+                )
+
+                solver.fts.add_invar(
+                    solver.create_term(solver.ops.Equal, term, starting_addr)
+                )
+
+            if (
+                "dim_counter" in name
+                and memtile_name in name
+                and controller in name
+                and not solver.fts.is_next_var(term)
+            ):
+                dim_cnt_type = term.get_sort()
+
+                # Create LUT for dim_cnt and dim_out
+                dim_cnt_var = solver.create_fts_state_var(
+                    f"{memtile_name}_dimemsion_cnt",
+                    solver.solver.make_sort(
+                        ss.sortkinds.ARRAY, solver.create_bvsort(16), dim_cnt_type
+                    ),
+                )
+
+                for i, dim_cnt in enumerate(dim_out):
+                    dm_sort = dim_cnt_type.get_width() // len(dim_cnt)
+
+                    dim_cnt_concat = 0
+
+                    for dc_idx, dc in enumerate(dim_cnt):
+                        dim_cnt_concat += dc << (dc_idx * dm_sort)
+
+                    dim_cnt_var = solver.create_term(
+                        solver.ops.Store,
+                        dim_cnt_var,
+                        solver.create_const(i, solver.create_bvsort(16)),
+                        solver.create_const(dim_cnt_concat, dim_cnt_type),
+                    )
+
+                starting_dim_cnt = solver.create_term(
+                    solver.ops.Select, dim_cnt_var, solver.cycle_count
+                )
+
+                solver.fts.constrain_init(
+                    solver.create_term(solver.ops.Equal, term, starting_dim_cnt)
+                )
+
+
+def mem_tile_addr_dim_values(config, cycles, iterator_support=2):
+
+    model_ag = AddrGenModel(iterator_support=iterator_support, address_width=16)
+
+    transformed_config = {}
+
+    transformed_config["starting_addr"] = config["cycle_starting_addr"][0]
+    transformed_config["dimensionality"] = config["dimensionality"]
+    for i in range(config["dimensionality"]):
+        transformed_config[f"strides_{i}"] = config["cycle_stride"][i]
+        transformed_config[f"ranges_{i}"] = config["extent"][i]
+
+    model_ag.set_config(transformed_config)
+
+    addr_out = []
+    dim_out = []
+
+    for cycle in range(cycles):
+        addr_out.append(model_ag.get_address())
+        dim_out.append(model_ag.dim_cnt.copy())
+
+        if cycle == model_ag.get_address():
+            model_ag.step()
+
+        cycle += 1
+
+    return addr_out, dim_out
