@@ -44,8 +44,9 @@ def port_remap_mem(mode, port, port_remap):
             "ren_in_0": "ren",
             "data_out_0": "data_out",
         }
-        assert port in hack_remap, f"Port {port} not in hack remap"
-        port = hack_remap[port]
+        if port in hack_remap: 
+            port = hack_remap[port]
+
 
     if mode == "stencil_valid":
         if "stencil_valid" in port:
@@ -488,13 +489,16 @@ def node_to_smt(
             solver.fts.add_invar(
                 solver.create_term(solver.ops.Equal, out_symbol, reg_val)
             )
-    elif tile_type == "corebit.const" or tile_type == "coreir.const":
-        value = data["inst"].config["value"].value
-        # Value to int
-        if type(value) == bool:
-            value = int(value)
+    elif tile_type == "corebit.const" or tile_type == "coreir.const" or tile_type == "pnr_const":
+        if (tile_type == "pnr_const"):
+            value = data["value"]
         else:
-            value = value.value
+            value = data["inst"].config["value"].value
+            # Value to int
+            if type(value) == bool:
+                value = int(value)
+            else:
+                value = value.value
         const = solver.create_const(value, out_symbols[0].get_sort())
         solver.fts.add_invar(
             solver.create_term(solver.ops.Equal, out_symbols[0], const)
@@ -565,15 +569,11 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
         node_symbols_in = {}
         node_symbols_out = {}
         if "inst" not in data:
-            assert (
-                node == "in"
-                or node == "out"
-                or data["node_type"] == "route"
-                # ), "Only in and out nodes should not have an inst attribute"
-            ), "Only route nodes should not have an inst attribute"
+            if str(node) == "in" or str(node) == "out":
+                data["node_type"] = "route"
             node_to_smt(
                 solver,
-                "route",
+                data["node_type"],
                 in_symbols,
                 out_symbols,
                 data,
@@ -658,7 +658,7 @@ def read_coreir(coreir_filename, top_module=None):
     return cmod.definition
 
 
-def pnr_to_nx(pmod, cmod):  # pmod = pnr file
+def pnr_to_nx(pmod, cmod, instance_to_instr):  # pmod = pnr file
     """
     Convert a PnR module to a NetworkX graph.
     """
@@ -673,15 +673,50 @@ def pnr_to_nx(pmod, cmod):  # pmod = pnr file
             name = pmod.id_to_name[str(node)]
         else:
             name = str(node)
-        # if node is a tile node, map to instance
+        # if node is a tile node, map to instructions
         if name in node_to_inst_dict.keys():
-            # if (node in pmod.get_tiles()):
+            # add the node itself
             g.add_node(
                 str(node),
                 inst=node_to_inst_dict[name],
                 node_type="tile",
                 node_name=name,
             )
+            # add the instructions of the node
+            if node in pmod.get_pes():
+                g.add_node(
+                    str(node) + "_inst",
+                    node_type = "pnr_const",
+                    value = instance_to_instr[name].value,
+                    node_name = str(node) + "_inst",
+                )
+                source_port = "out"
+                sink_port = "inst"
+                bitwidth = instance_to_instr[name].size
+                g.add_edge(
+                    str(node) + "_inst",
+                    str(node),
+                    source_port=source_port,
+                    sink_port=sink_port,
+                    bitwidth=bitwidth,
+                )
+                # add clk enable of the node
+                g.add_node(
+                    str(node) + "_clk_en",
+                    node_type = "pnr_const",
+                    value = 1,
+                    node_name = str(node) + "_clk_en",
+                )
+                source_port = "out"
+                sink_port = "clk_en"
+                bitwidth = 1
+                g.add_edge(
+                    str(node) + "_clk_en",
+                    str(node),
+                    source_port=source_port,
+                    sink_port=sink_port,
+                    bitwidth=bitwidth,
+                )
         else:  # if node is a route node, add to graph directly
             g.add_node(str(node), node_type="route", node_name=name)
             assert (
@@ -729,6 +764,10 @@ def pnr_to_nx(pmod, cmod):  # pmod = pnr file
             bitwidth=bitwidth,
         )
         # breakpoint()
+    # go through all nodes
+    # find all pes
+    # add instruction node as input to pe
+
     return g
 
     # find if edge[0],[1] are tile or route nodes
