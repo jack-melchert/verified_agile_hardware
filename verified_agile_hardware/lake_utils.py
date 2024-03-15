@@ -316,7 +316,7 @@ def mem_tile_constraint_generator(
                     solver.ops.Select, dim_cnt_var, solver.cycle_count
                 )
 
-                solver.fts.constrain_init(
+                solver.fts.add_invar(
                     solver.create_term(solver.ops.Equal, term, starting_dim_cnt)
                 )
 
@@ -347,4 +347,34 @@ def mem_tile_addr_dim_values(config, cycles, iterator_support=2):
 
         cycle += 1
 
+
     return addr_out, dim_out
+
+
+def mem_tile_get_num_valids(config, cycles, iterator_support=2):
+
+    model_ag = AddrGenModel(iterator_support=iterator_support, address_width=16)
+
+    transformed_config = {}
+
+    transformed_config["starting_addr"] = config["cycle_starting_addr"][0]
+    transformed_config["dimensionality"] = config["dimensionality"]
+    for i in range(config["dimensionality"]):
+        transformed_config[f"strides_{i}"] = config["cycle_stride"][i]
+        transformed_config[f"ranges_{i}"] = config["extent"][i]
+
+    model_ag.set_config(transformed_config)
+
+    cycles_to_idx = []
+    num_valids = 0
+
+    for cycle in range(cycles):
+        cycles_to_idx.append(num_valids)
+        if cycle == model_ag.get_address():
+            num_valids += 1
+            model_ag.step()
+
+        cycle += 1
+
+
+    return cycles_to_idx

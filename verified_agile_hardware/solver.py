@@ -25,7 +25,8 @@ class Solver:
         self.num_memtiles = 0
         self.first_valid_output = float("inf")
         self.stencil_valid_to_port_controller = {}
-        self.stencil_valid_to_cycle_starting_addr = {}
+        self.stencil_valid_to_schedule = {}
+        self.max_cycles = 100
         self.cycle_count = self.fts.make_statevar(
             "cycle_count", self.solver.make_sort(ss.sortkinds.BV, 16)
         )

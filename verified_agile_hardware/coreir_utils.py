@@ -190,9 +190,7 @@ def node_to_smt(
             valid_out_starting_cycle = data["inst"].metadata["config"]["stencil_valid"][
                 "cycle_starting_addr"
             ][0]
-            solver.stencil_valid_to_cycle_starting_addr[str(node)] = (
-                valid_out_starting_cycle
-            )
+            solver.stencil_valid_to_schedule[str(node)] = data["inst"].metadata["config"]["stencil_valid"]
             solver.first_valid_output = min(
                 solver.first_valid_output, valid_out_starting_cycle
             )
@@ -261,7 +259,7 @@ def node_to_smt(
         )
 
         mem_tile_constraint_generator(
-            solver, mem_name, metadata, 4096, iterator_support=6
+            solver, mem_name, metadata, solver.max_cycles, iterator_support=6
         )
 
         used_mem_inputs = []
