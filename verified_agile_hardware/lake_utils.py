@@ -347,7 +347,6 @@ def mem_tile_addr_dim_values(config, cycles, iterator_support=2):
 
         cycle += 1
 
-
     return addr_out, dim_out
 
 
@@ -375,6 +374,5 @@ def mem_tile_get_num_valids(config, cycles, iterator_support=2):
             model_ag.step()
 
         cycle += 1
-
 
     return cycles_to_idx

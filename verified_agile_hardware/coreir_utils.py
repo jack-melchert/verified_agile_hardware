@@ -22,7 +22,7 @@ from verified_agile_hardware.lake_utils import (
 )
 
 
-def coreir_to_pdf(nx_graph, filename):
+def nx_to_pdf(nx_graph, filename):
     """
     Convert a NetworkX graph to a PDF.
     """
@@ -44,9 +44,8 @@ def port_remap_mem(mode, port, port_remap):
             "ren_in_0": "ren",
             "data_out_0": "data_out",
         }
-        if port in hack_remap: 
+        if port in hack_remap:
             port = hack_remap[port]
-
 
     if mode == "stencil_valid":
         if "stencil_valid" in port:
@@ -60,33 +59,27 @@ def port_remap_mem(mode, port, port_remap):
     return port
 
 
-def node_to_smt(
-    solver,
-    tile_type,
-    in_symbols,
-    out_symbols,
-    data,
-    node,
-    node_symbols_in,
-    node_symbols_out,
-):
+def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay=False):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
-        # check if is an input node
-        if "node_name" in data and "input" in data["node_name"]:
-            in_symbols_dict = {str(s): s for s in out_symbols}
-            node_symbols_in.update(in_symbols_dict)
-        else:
-            out_symbols_dict = {str(s): s for s in in_symbols}
-            node_symbols_out.update(out_symbols_dict)
+        assert len(in_symbols) == 1 and len(out_symbols) == 1
 
-        for in_symbol in in_symbols:
-            for out_symbol in out_symbols:
-                solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
-                )
+        if io_delay:
+            io_val = solver.create_fts_state_var(
+                f"{str(node)}.io_val", in_symbols[0].get_sort()
+            )
+            solver.fts.assign_next(io_val, in_symbols[0])
+
+            solver.fts.add_invar(
+                solver.create_term(solver.ops.Equal, out_symbols[0], io_val)
+            )
+        else:
+            for in_symbol in in_symbols:
+                for out_symbol in out_symbols:
+                    solver.fts.add_invar(
+                        solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
+                    )
 
     elif tile_type == "global.PE":
-        # for each output symbol, convert only formula associated with that symbol, not the whole PE
 
         out_port_names = [
             str(out_symbol).split(f"{node}.")[1] for out_symbol in out_symbols
@@ -191,7 +184,9 @@ def node_to_smt(
             valid_out_starting_cycle = data["inst"].metadata["config"]["stencil_valid"][
                 "cycle_starting_addr"
             ][0]
-            solver.stencil_valid_to_schedule[str(node)] = data["inst"].metadata["config"]["stencil_valid"]
+            solver.stencil_valid_to_schedule[str(node)] = data["inst"].metadata[
+                "config"
+            ]["stencil_valid"]
             solver.first_valid_output = min(
                 solver.first_valid_output, valid_out_starting_cycle
             )
@@ -487,8 +482,12 @@ def node_to_smt(
             solver.fts.add_invar(
                 solver.create_term(solver.ops.Equal, out_symbol, reg_val)
             )
-    elif tile_type == "corebit.const" or tile_type == "coreir.const" or tile_type == "pnr_const":
-        if (tile_type == "pnr_const"):
+    elif (
+        tile_type == "corebit.const"
+        or tile_type == "coreir.const"
+        or tile_type == "pnr_const"
+    ):
+        if tile_type == "pnr_const":
             value = data["value"]
         else:
             value = data["inst"].config["value"].value
@@ -509,8 +508,7 @@ def node_to_smt(
                 )
 
 
-# def nx_to_smt(graph, interconnect, file_info=None, app_dir=None):
-def nx_to_smt(graph, interconnect, solver, app_dir=None):
+def nx_to_smt(graph, interconnect, solver, app_dir=None, io_delay=False):
     if not os.path.exists(solver.app_dir):
         os.mkdir(solver.app_dir)
 
@@ -520,7 +518,13 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
 
     for node, data in graph.nodes(data=True):
         if (
-            "port_controller" in str(node)
+            (
+                "port_controller" in str(node)
+                or (
+                    str(node) in solver.id_to_name
+                    and "port_controller" in solver.id_to_name[str(node)]
+                )
+            )
             and "inst" in data
             and data["inst"].module.name == "Mem"
         ):
@@ -544,7 +548,7 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
         symbols = {}
 
         in_symbols = []
-        for in_ in graph.in_edges(node):  # all edges going into a node?
+        for in_ in graph.in_edges(node):
             edge_info = graph.edges[in_]
             name = f"{in_[1]}.{graph.edges[in_]['sink_port']}"
             if name not in symbols:
@@ -564,36 +568,14 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
             out_symbols.append(symbols[name])
         node_symbols[node] = symbols
 
-        node_symbols_in = {}
-        node_symbols_out = {}
         if "inst" not in data:
             if str(node) == "in" or str(node) == "out":
                 data["node_type"] = "route"
-            node_to_smt(
-                solver,
-                data["node_type"],
-                in_symbols,
-                out_symbols,
-                data,
-                node,
-                node_symbols["in"],
-                node_symbols["out"],
-            )
+            tile_type = data["node_type"]
         else:
             tile_type = data["inst"].module.ref_name
-            # print(node, " ", in_symbols, " ", out_symbols)
-            node_to_smt(
-                solver,
-                tile_type,
-                in_symbols,
-                out_symbols,
-                data,
-                node,
-                node_symbols["in"],
-                node_symbols["out"],
-            )
-        # node_symbols["in"].update(node_symbols_in)
-        # node_symbols["out"].update(node_symbols_out)
+
+        node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay)
 
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
@@ -604,7 +586,7 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
     return solver, node_symbols["in"], node_symbols["out"]
 
 
-def coreir_to_nx(cmod):  # cmod = coreir file
+def coreir_to_nx(cmod):
     """
     Convert a CoreIR module to a NetworkX graph.
     """
@@ -656,12 +638,13 @@ def read_coreir(coreir_filename, top_module=None):
     return cmod.definition
 
 
-def pnr_to_nx(pmod, cmod, instance_to_instr):  # pmod = pnr file
+def pnr_to_nx(pmod, cmod, instance_to_instr):
     """
     Convert a PnR module to a NetworkX graph.
     """
     g = nx.DiGraph()
     node_to_inst_dict = dict()
+
     # Create a dictionary that maps node names to instances
     for inst in cmod.instances:
         node_to_inst_dict[inst.name] = inst
@@ -684,9 +667,9 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):  # pmod = pnr file
             if node in pmod.get_pes():
                 g.add_node(
                     str(node) + "_inst",
-                    node_type = "pnr_const",
-                    value = instance_to_instr[name].value,
-                    node_name = str(node) + "_inst",
+                    node_type="pnr_const",
+                    value=instance_to_instr[name].value,
+                    node_name=str(node) + "_inst",
                 )
                 source_port = "out"
                 sink_port = "inst"
@@ -701,9 +684,9 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):  # pmod = pnr file
                 # add clk enable of the node
                 g.add_node(
                     str(node) + "_clk_en",
-                    node_type = "pnr_const",
-                    value = 1,
-                    node_name = str(node) + "_clk_en",
+                    node_type="pnr_const",
+                    value=1,
+                    node_name=str(node) + "_clk_en",
                 )
                 source_port = "out"
                 sink_port = "clk_en"
@@ -720,8 +703,6 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):  # pmod = pnr file
             assert (
                 node not in pmod.get_tiles() or node in pmod.get_regs()
             ), f"Tile node that's not register {name} claimed as route node"
-            # if (node in pmod.get_tiles()):
-            #     print(str(node))
 
     for edge in pmod.edges:
         # edge[0] = source, edge[1] = sink
@@ -740,6 +721,7 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):  # pmod = pnr file
         else:  # if the source node is a port node
             source_port = "out"
             bitwidth = edge[0].bit_width
+
         if edge[1] in pmod.get_tiles() and edge[1] not in pmod.get_regs():
             # iterate through sources of the node
             for source in pmod.sources[edge[1]]:
@@ -754,6 +736,7 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):  # pmod = pnr file
         else:
             sink_port = "in"
             bitwidth = edge[1].bit_width
+
         g.add_edge(
             str(edge[0]),
             str(edge[1]),
@@ -761,11 +744,28 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):  # pmod = pnr file
             sink_port=sink_port,
             bitwidth=bitwidth,
         )
-        # breakpoint()
-    # go through all nodes
-    # find all pes
-    # add instruction node as input to pe
+
+    g.add_node("in", node_type="in")
+    g.add_node("out", node_type="out")
+
+    for node in pmod.get_input_ios():
+        if node.tile_id[0] == "I":
+            g.add_edge(
+                "in", str(node), source_port=str(node), sink_port="out", bitwidth=17
+            )
+        else:
+            g.add_edge(
+                "in", str(node), source_port=str(node), sink_port="out", bitwidth=1
+            )
+
+    for node in pmod.get_output_ios():
+        if node.tile_id[0] == "I":
+            g.add_edge(
+                str(node), "out", source_port="out", sink_port=str(node), bitwidth=17
+            )
+        else:
+            g.add_edge(
+                str(node), "out", source_port="out", sink_port=str(node), bitwidth=1
+            )
 
     return g
-
-    # find if edge[0],[1] are tile or route nodes
