@@ -23,11 +23,11 @@ class Solver:
         self.clks = []
         self.flushes = []
         self.num_memtiles = 0
-        self.first_valid_output = float("inf")
+        self.first_valid_output = 0
         self.stencil_valid_to_port_controller = {}
         self.stencil_valid_to_schedule = {}
         self.id_to_name = {}
-        self.max_cycles = 10
+        self.max_cycles = 20
         self.cycle_count = self.fts.make_statevar(
             "cycle_count", self.solver.make_sort(ss.sortkinds.BV, 16)
         )

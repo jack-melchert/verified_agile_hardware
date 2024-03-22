@@ -187,7 +187,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay
             solver.stencil_valid_to_schedule[str(node)] = data["inst"].metadata[
                 "config"
             ]["stencil_valid"]
-            solver.first_valid_output = min(
+            solver.first_valid_output = max(
                 solver.first_valid_output, valid_out_starting_cycle
             )
 
