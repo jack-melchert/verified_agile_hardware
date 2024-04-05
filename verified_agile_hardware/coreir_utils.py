@@ -61,7 +61,7 @@ def port_remap_mem(mode, port, port_remap):
 
 def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay=False):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
-        assert len(in_symbols) == 1 and len(out_symbols) == 1
+        assert len(in_symbols) == 1, breakpoint()
 
         if io_delay:
             io_val = solver.create_fts_state_var(
@@ -69,9 +69,10 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay
             )
             solver.fts.assign_next(io_val, in_symbols[0])
 
-            solver.fts.add_invar(
-                solver.create_term(solver.ops.Equal, out_symbols[0], io_val)
-            )
+            for out_symbol in out_symbols:
+                solver.fts.add_invar(
+                    solver.create_term(solver.ops.Equal, out_symbol, io_val)
+                )
         else:
             for in_symbol in in_symbols:
                 for out_symbol in out_symbols:
@@ -196,6 +197,15 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay
         mem_tile = solver.interconnect.tile_circuits[(3, 1)].core
         config = mem_tile.get_config_bitstream(data["inst"].metadata)
 
+        strg_ub_vec = None
+        for controller in mem_tile.CC.controllers:
+            if controller.name == "strg_ub_vec":
+                strg_ub_vec = controller
+                break
+        assert strg_ub_vec is not None
+
+        lake_configs = strg_ub_vec.get_bitstream(metadata["config"])
+
         mode = "UB"
         if "stencil_valid" in metadata["config"]:
             mode = "stencil_valid"
@@ -255,7 +265,12 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay
         )
 
         mem_tile_constraint_generator(
-            solver, mem_name, metadata, solver.max_cycles, iterator_support=6
+            solver,
+            mem_name,
+            metadata,
+            lake_configs,
+            solver.max_cycles,
+            iterator_support=6,
         )
 
         used_mem_inputs = []
