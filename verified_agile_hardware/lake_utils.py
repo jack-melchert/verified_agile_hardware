@@ -222,151 +222,6 @@ def load_new_mem_tile(
     return mem_inputs, get_mem_btor_outputs(solver, btor_file)
 
 
-def constrain_cycle_starting_addr(solver, mem_name, metadata):
-
-    cycle_starting_addrs = {}
-
-    for controller, config in metadata["config"].items():
-        cycle_starting_addrs[controller] = config["cycle_starting_addr"][0]
-
-    for name, term in solver.fts.named_terms.items():
-        if "addr_out" in name and mem_name in name:
-            for controller, addr in cycle_starting_addrs.items():
-                if controller in name:
-                    solver.fts.constrain_init(
-                        solver.create_term(
-                            solver.ops.Equal,
-                            term,
-                            solver.create_const(addr, term.get_sort()),
-                        )
-                    )
-                    print(f"Constraining {name} to {addr}")
-
-
-def preprocess_config(config_dict):
-
-    # This mapping comes from the hardcoded mapping in lake
-    # Can't think of a better way to do this
-    controller_to_addr_out = {}
-    controller_to_addr_out["stencil_valid"] = (
-        "mem_ctrl_stencil_valid_flat.stencil_valid_inst.stencil_valid_sched_gen.addr_out"
-    )
-    controller_to_addr_out["in2agg_0"] = (
-        "strg_ub_vec_inst.agg_only.agg_write_sched_gen_0.addr_out"
-    )
-    controller_to_addr_out["in2agg_1"] = (
-        "strg_ub_vec_inst.agg_only.agg_write_sched_gen_1.addr_out"
-    )
-    controller_to_addr_out["sram2tb_0"] = (
-        "strg_ub_vec_inst.sram_tb_shared.output_sched_gen_0.addr_out"
-    )
-    controller_to_addr_out["sram2tb_1"] = (
-        "strg_ub_vec_inst.sram_tb_shared.output_sched_gen_1.addr_out"
-    )
-    controller_to_addr_out["tb2out_0"] = (
-        "strg_ub_vec_inst.tb_only.tb_read_sched_gen_0.addr_out"
-    )
-    controller_to_addr_out["tb2out_1"] = (
-        "strg_ub_vec_inst.tb_only.tb_read_sched_gen_1.addr_out"
-    )
-
-    controller_to_dim_counter = {}
-    controller_to_dim_counter["stencil_valid"] = (
-        "mem_ctrl_stencil_valid_flat.stencil_valid_inst.loops_stencil_valid.dim_counter"
-    )
-    controller_to_dim_counter["in2agg_0"] = (
-        "strg_ub_vec_inst.agg_only.loops_in2buf_0.dim_counter"
-    )
-    controller_to_dim_counter["in2agg_1"] = (
-        "strg_ub_vec_inst.agg_only.loops_in2buf_1.dim_counter"
-    )
-    controller_to_dim_counter["sram2tb_0"] = (
-        "strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_0.dim_counter"
-    )
-    controller_to_dim_counter["sram2tb_1"] = (
-        "strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_1.dim_counter"
-    )
-    controller_to_dim_counter["tb2out_0"] = (
-        "strg_ub_vec_inst.tb_only.loops_buf2out_read_0.dim_counter"
-    )
-    controller_to_dim_counter["tb2out_1"] = (
-        "strg_ub_vec_inst.tb_only.loops_buf2out_read_1.dim_counter"
-    )
-
-    read_controller_to_addr_out = {}
-    read_controller_to_addr_out["sram2tb_0"] = (
-        "strg_ub_vec_inst.sram_only.output_addr_gen_0.addr_out"
-    )
-    read_controller_to_addr_out["sram2tb_1"] = (
-        "strg_ub_vec_inst.sram_only.output_addr_gen_1.addr_out"
-    )
-    read_controller_to_addr_out["tb2out_0"] = (
-        "strg_ub_vec_inst.tb_only.tb_read_addr_gen_0.addr_out"
-    )
-    read_controller_to_addr_out["tb2out_1"] = (
-        "strg_ub_vec_inst.tb_only.tb_read_addr_gen_1.addr_out"
-    )
-
-    write_controller_to_addr_out = {}
-    write_controller_to_addr_out["in2agg_0"] = (
-        "strg_ub_vec_inst.agg_only.agg_write_addr_gen_0.addr_out"
-    )
-    write_controller_to_addr_out["in2agg_1"] = (
-        "strg_ub_vec_inst.agg_only.agg_write_addr_gen_1.addr_out"
-    )
-    write_controller_to_addr_out["sram2tb_0"] = (
-        "strg_ub_vec_inst.tb_only.tb_write_addr_gen_0.addr_out"
-    )
-    write_controller_to_addr_out["sram2tb_1"] = (
-        "strg_ub_vec_inst.tb_only.tb_write_addr_gen_1.addr_out"
-    )
-
-    processed_config = {}
-
-    for controller, config in config_dict["config"].items():
-        if controller in controller_to_addr_out:
-            assert controller in controller_to_dim_counter
-
-            processed_config[controller] = {}
-
-            processed_config[controller]["addr_out"] = controller_to_addr_out[
-                controller
-            ]
-            processed_config[controller]["dim_counter"] = controller_to_dim_counter[
-                controller
-            ]
-
-            processed_config[controller]["cycle_starting_addr"] = config[
-                "cycle_starting_addr"
-            ]
-            processed_config[controller]["cycle_stride"] = config["cycle_stride"]
-            processed_config[controller]["extent"] = config["extent"]
-
-            if controller in write_controller_to_addr_out:
-                processed_config[controller]["write_addr_out"] = (
-                    write_controller_to_addr_out[controller]
-                )
-                processed_config[controller]["write_data_starting_addr"] = config[
-                    "write_data_starting_addr"
-                ]
-                processed_config[controller]["write_data_stride"] = config[
-                    "write_data_stride"
-                ]
-
-            if controller in read_controller_to_addr_out:
-                processed_config[controller]["read_addr_out"] = (
-                    read_controller_to_addr_out[controller]
-                )
-                processed_config[controller]["read_data_starting_addr"] = config[
-                    "read_data_starting_addr"
-                ]
-                processed_config[controller]["read_data_stride"] = config[
-                    "read_data_stride"
-                ]
-
-    return processed_config
-
-
 def mem_tile_constraint_generator(
     solver, memtile_name, config_dict, lake_configs, cycles, iterator_support=2
 ):
@@ -442,12 +297,12 @@ def mem_tile_constraint_generator(
     write_addr_out_to_symbol_name["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
         "strg_ub_vec_inst.agg_only.agg_write_addr_gen_1.addr_out"
     )
-    write_addr_out_to_symbol_name["tb_only_tb_read_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.tb_only.tb_write_addr_gen_0.addr_out"
-    )
-    write_addr_out_to_symbol_name["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.tb_only.tb_write_addr_gen_1.addr_out"
-    )
+    write_addr_out_to_symbol_name[
+        "sram_tb_shared_output_sched_gen_0_sched_addr_gen"
+    ] = "strg_ub_vec_inst.tb_only.tb_write_addr_gen_0.addr_out"
+    write_addr_out_to_symbol_name[
+        "sram_tb_shared_output_sched_gen_1_sched_addr_gen"
+    ] = "strg_ub_vec_inst.tb_only.tb_write_addr_gen_1.addr_out"
 
     for controller, addr_out_list in addr_out.items():
         for name, term in solver.fts.named_terms.items():

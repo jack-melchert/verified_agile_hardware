@@ -10,6 +10,7 @@ class AddresssGeneratorModel:
         self.config["dimensionality"] = 0
 
         self.address = 0
+        self.next_dim = 0
 
         for i in range(self.iterator_support):
             self.config[f"strides_{i}"] = 0
@@ -27,11 +28,13 @@ class AddresssGeneratorModel:
         return self.address
 
     def step(self, curr_dim):
-        offset = self.config[f"strides_{curr_dim}"]
+        offset = self.config[f"strides_{self.next_dim}"]
         self.address = self.address + offset
 
         if self.address >= 2**self.address_width:
             self.address = 0
+
+        self.next_dim = curr_dim
 
 
 class SchedGenModel:
@@ -85,6 +88,9 @@ class SchedGenModel:
 def simulate_mem_tile_counters(
     config, lake_configs, cycles, iterator_support, address_width=16
 ):
+
+    lake_configs_dict = {k: v for (k, v) in lake_configs}
+
     # So in order to get the valid starting address, dim count, read address, and write address, we need to run the
     # SchedGenModel for a number of cycles and record the outputs at each cycle
 
@@ -194,10 +200,11 @@ def simulate_mem_tile_counters(
     sched_gen_to_write_addr_gen["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
         addr_gens["agg_only_agg_write_addr_gen_1"]
     )
-    sched_gen_to_write_addr_gen["tb_only_tb_read_sched_gen_0_sched_addr_gen"] = (
+
+    sched_gen_to_write_addr_gen["sram_tb_shared_output_sched_gen_0_sched_addr_gen"] = (
         addr_gens["tb_only_tb_write_addr_gen_0"]
     )
-    sched_gen_to_write_addr_gen["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = (
+    sched_gen_to_write_addr_gen["sram_tb_shared_output_sched_gen_1_sched_addr_gen"] = (
         addr_gens["tb_only_tb_write_addr_gen_1"]
     )
 
@@ -307,16 +314,20 @@ def simulate_mem_tile_counters(
 
                 curr_dim = 0
 
-                if controller in config["config"]:
-                    extent = config["config"][controller_name]["extent"]
+                if controller_name in loops_to_sched_gen:
+                    loop_name = loops_to_sched_gen[controller_name]
 
-                    for i in range(len(extent)):
-                        if (
-                            controller.dim_cnt[i]
-                            == config["config"][controller_name]["extent"][i]
-                        ):
-                            curr_dim = i
-                            break
+                    dimensionality = loop_name + "_dimensionality"
+
+                    if dimensionality in lake_configs_dict:
+                        extents = []
+                        for dim in range(lake_configs_dict[dimensionality]):
+                            r = loop_name + "_ranges_" + str(dim)
+                            extent = lake_configs_dict[r]
+
+                            if controller.dim_cnt[dim] == extent:
+                                curr_dim = dim + 1
+                                break
 
                 if controller_name in sched_gen_to_read_addr_gen:
                     read_controller = sched_gen_to_read_addr_gen[controller_name]
@@ -327,5 +338,16 @@ def simulate_mem_tile_counters(
                     write_controller.step(curr_dim)
 
                 controller.step()
+
+    # There is a pipeline register between the sram_tb_shared sched gen and the tb write addr gen
+    # Need to delay this controller write addr by one cycle
+    if "sram_tb_shared_output_sched_gen_0_sched_addr_gen" in write_addr_out:
+        write_addr_out["sram_tb_shared_output_sched_gen_0_sched_addr_gen"] = [
+            0
+        ] + write_addr_out["sram_tb_shared_output_sched_gen_0_sched_addr_gen"][:-1]
+    if "sram_tb_shared_output_sched_gen_1_sched_addr_gen" in write_addr_out:
+        write_addr_out["sram_tb_shared_output_sched_gen_1_sched_addr_gen"] = [
+            0
+        ] + write_addr_out["sram_tb_shared_output_sched_gen_1_sched_addr_gen"][:-1]
 
     return addr_out, dim_out, read_addr_out, write_addr_out

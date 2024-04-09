@@ -17,7 +17,6 @@ from verified_agile_hardware.peak_utils import (
 from verified_agile_hardware.lake_utils import (
     load_new_mem_tile,
     config_rom,
-    constrain_cycle_starting_addr,
     mem_tile_constraint_generator,
 )
 
