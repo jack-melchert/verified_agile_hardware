@@ -289,6 +289,12 @@ def mem_tile_constraint_generator(
     read_addr_out_to_symbol_name["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = (
         "strg_ub_vec_inst.tb_only.tb_read_addr_gen_1.addr_out"
     )
+    read_addr_out_to_symbol_name["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
+        "strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_0.lin_addr_cnter"
+    )
+    read_addr_out_to_symbol_name["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
+        "strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_1.lin_addr_cnter"
+    )
 
     write_addr_out_to_symbol_name = {}
     write_addr_out_to_symbol_name["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
@@ -311,7 +317,11 @@ def mem_tile_constraint_generator(
                 and memtile_name in name
                 and not solver.fts.is_next_var(term)
             ):
-                print("Adding constraint for addr_out", controller)
+                print(
+                    "Adding constraint for addr_out",
+                    controller,
+                    addr_out_to_symbol_name[controller],
+                )
                 addr_out_type = term.get_sort()
 
                 # Create LUT for addr_out and dim_out
@@ -346,7 +356,11 @@ def mem_tile_constraint_generator(
                 and memtile_name in name
                 and not solver.fts.is_next_var(term)
             ):
-                print("Adding constraint for dim counter", controller)
+                print(
+                    "Adding constraint for dim counter",
+                    controller,
+                    dim_out_to_symbol_name[controller],
+                )
                 dim_cnt_type = term.get_sort()
 
                 # Create LUT for dim_cnt and dim_out
@@ -388,7 +402,11 @@ def mem_tile_constraint_generator(
                 and memtile_name in name
                 and not solver.fts.is_next_var(term)
             ):
-                print("Adding constraint for read_addr_out", controller)
+                print(
+                    "Adding constraint for read_addr_out",
+                    controller,
+                    read_addr_out_to_symbol_name[controller],
+                )
                 addr_out_type = term.get_sort()
 
                 # Create LUT for addr_out and dim_out
@@ -423,7 +441,11 @@ def mem_tile_constraint_generator(
                 and memtile_name in name
                 and not solver.fts.is_next_var(term)
             ):
-                print("Adding constraint for write_addr_out", controller)
+                print(
+                    "Adding constraint for write_addr_out",
+                    controller,
+                    write_addr_out_to_symbol_name[controller],
+                )
                 addr_out_type = term.get_sort()
 
                 # Create LUT for addr_out and dim_out

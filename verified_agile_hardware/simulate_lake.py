@@ -13,7 +13,7 @@ class AddresssGeneratorModel:
         self.next_dim = 0
 
         for i in range(self.iterator_support):
-            self.config[f"strides_{i}"] = 0
+            self.config[f"strides_{i}"] = 1
 
     def set_config(self, new_config):
         for key, config_val in new_config.items():
@@ -103,7 +103,6 @@ def simulate_mem_tile_counters(
         iterator_support=iterator_support,
         address_width=address_width,
     )
-    # sched_gens["agg_sram_shared_agg_read_sched_gen_0_sched_addr_gen"] = SchedGenModel("agg_sram_shared_agg_read_sched_gen_0", iterator_support=iterator_support, address_width=address_width)
     sched_gens["sram_tb_shared_output_sched_gen_0_sched_addr_gen"] = SchedGenModel(
         "sram_tb_shared_output_sched_gen_0",
         iterator_support=iterator_support,
@@ -121,7 +120,6 @@ def simulate_mem_tile_counters(
         iterator_support=iterator_support,
         address_width=address_width,
     )
-    # sched_gens["agg_sram_shared_agg_read_sched_gen_1_sched_addr_gen"] = SchedGenModel("agg_sram_shared_agg_read_sched_gen_1", iterator_support=iterator_support, address_width=address_width)
     sched_gens["sram_tb_shared_output_sched_gen_1_sched_addr_gen"] = SchedGenModel(
         "sram_tb_shared_output_sched_gen_1",
         iterator_support=iterator_support,
@@ -158,6 +156,17 @@ def simulate_mem_tile_counters(
         "tb_only_tb_read_addr_gen_1", iterator_support=iterator_support, address_width=4
     )
 
+    addr_gens["agg_sram_shared_addr_gen_0"] = AddresssGeneratorModel(
+        "agg_sram_shared_addr_gen_0",
+        iterator_support=iterator_support,
+        address_width=9,
+    )
+    addr_gens["agg_sram_shared_addr_gen_1"] = AddresssGeneratorModel(
+        "agg_sram_shared_addr_gen_1",
+        iterator_support=iterator_support,
+        address_width=9,
+    )
+
     addr_gens["agg_only_agg_write_addr_gen_0"] = AddresssGeneratorModel(
         "agg_only_agg_write_addr_gen_0",
         iterator_support=iterator_support,
@@ -191,6 +200,16 @@ def simulate_mem_tile_counters(
     )
     sched_gen_to_read_addr_gen["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = (
         addr_gens["tb_only_tb_read_addr_gen_1"]
+    )
+
+    # These two are special cases
+    # They use the last 2 bits of of agg_only write sched gen as the address
+    # Step is the one cycle registered reduction and of the 2 bit sliced address
+    sched_gen_to_read_addr_gen["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
+        addr_gens["agg_sram_shared_addr_gen_0"]
+    )
+    sched_gen_to_read_addr_gen["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
+        addr_gens["agg_sram_shared_addr_gen_1"]
     )
 
     sched_gen_to_write_addr_gen = {}
@@ -331,7 +350,18 @@ def simulate_mem_tile_counters(
 
                 if controller_name in sched_gen_to_read_addr_gen:
                     read_controller = sched_gen_to_read_addr_gen[controller_name]
-                    read_controller.step(curr_dim)
+                    if (
+                        "agg_sram_shared_addr_gen"
+                        not in sched_gen_to_read_addr_gen[controller_name].name
+                    ):
+                        read_controller.step(curr_dim)
+                    else:
+                        # agg sram shared addr gen is a special case
+                        # Only steps if the last 2 bits of the agg only sched gen address are 0
+                        # Get last two bits of controller.get_address()
+                        last_two_bits = controller.get_address() & 0b11
+                        if last_two_bits == 3:
+                            read_controller.step(curr_dim)
 
                 if controller_name in sched_gen_to_write_addr_gen:
                     write_controller = sched_gen_to_write_addr_gen[controller_name]
@@ -339,15 +369,23 @@ def simulate_mem_tile_counters(
 
                 controller.step()
 
+        # Special case
+
     # There is a pipeline register between the sram_tb_shared sched gen and the tb write addr gen
     # Need to delay this controller write addr by one cycle
-    if "sram_tb_shared_output_sched_gen_0_sched_addr_gen" in write_addr_out:
-        write_addr_out["sram_tb_shared_output_sched_gen_0_sched_addr_gen"] = [
-            0
-        ] + write_addr_out["sram_tb_shared_output_sched_gen_0_sched_addr_gen"][:-1]
-    if "sram_tb_shared_output_sched_gen_1_sched_addr_gen" in write_addr_out:
-        write_addr_out["sram_tb_shared_output_sched_gen_1_sched_addr_gen"] = [
-            0
-        ] + write_addr_out["sram_tb_shared_output_sched_gen_1_sched_addr_gen"][:-1]
+    write_registered_step = [
+        "sram_tb_shared_output_sched_gen_0_sched_addr_gen",
+        "sram_tb_shared_output_sched_gen_1_sched_addr_gen",
+    ]
+    read_registered_step = [
+        "agg_only_agg_write_sched_gen_0_sched_addr_gen",
+        "agg_only_agg_write_sched_gen_1_sched_addr_gen",
+    ]
+
+    for controller_name in write_registered_step:
+        write_addr_out[controller_name] = [0] + write_addr_out[controller_name][:-1]
+
+    for controller_name in read_registered_step:
+        read_addr_out[controller_name] = [0] + read_addr_out[controller_name][:-1]
 
     return addr_out, dim_out, read_addr_out, write_addr_out
