@@ -14,6 +14,7 @@ class Solver:
         self.fts = pono.FunctionalTransitionSystem(self.solver)
         self.ur = pono.Unroller(self.fts)
         self.ops = ss.primops
+        self.sortkinds = ss.sortkinds
         self.module_smt = {}
         self.bboxes = {}
         self.file_info = {}
@@ -22,7 +23,14 @@ class Solver:
         self.clks = []
         self.flushes = []
         self.num_memtiles = 0
-        self.first_valid_output = float("inf")
+        self.first_valid_output = 0
+        self.stencil_valid_to_port_controller = {}
+        self.stencil_valid_to_schedule = {}
+        self.id_to_name = {}
+        self.max_cycles = 100
+        self.cycle_count = self.fts.make_statevar(
+            "cycle_count", self.solver.make_sort(ss.sortkinds.BV, 16)
+        )
 
         bvsort16 = self.solver.make_sort(ss.sortkinds.BV, 16)
         self.bmc_counter = self.fts.make_statevar("bmc_counter", bvsort16)

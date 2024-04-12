@@ -97,62 +97,32 @@ def mem_tile_to_btor(
     sv2v(memtile_filename, sv2v_memtile_filename)
 
     script = f"""
-# read in the file(s) -- there can be multiple
-# whitespace separated files, and you can
-# escape new lines if necessary
 read -formal {sv2v_memtile_filename} {sv2v_garnet_filename} 
 
-# prep does a conservative elaboration
-# of the top module provided
 prep -top {mem_tile_module};
 
-# this command just does a sanity check
-# of the hierarchy
 hierarchy -check;
 
-# If an assumption is flopped, you might
-# see strange behavior at the last state
-# (because the clock hasn't toggled)
-# this command ensures that assumptions
-# hold at every state
 chformal -assume -early;
 
-# this processes memories
-# nomap means it will keep them as arrays
-memory -nomap; opt;
+memory -nomap; 
+#opt -full;
+clean -purge;
 
-# flatten the design hierarchy
-flatten; opt;
+flatten; 
+#opt -full;
+clean -purge;
 
-# (optional) uncomment and set values to simulate reset signal
-# use -resetn for an active low pin
-# -n configures the number of cycles to simulate
-# -rstlen configures how long the reset is active (recommended to keep it active for the whole simulation)
-# -w tells it to write back the final state of the simulation as the initial state in the btor2 file
-# another useful option is -zinit which zero initializes any uninitialized state
-# sim -clock <clockpin> -reset <resetpin> -n <number of cycles> -rstlen <number of cycles> -w <top_module>
-
-# (optional) use an "explicit" clock
-# e.g. every state is a half cycle of the
-# fastest clock
-# use this option if you see errors that
-# refer to "adff" or asynchronous components
-# IMPORTANT NOTE: the clocks are not
-# automatically toggled if you use this option
 clk2fflogic;
-opt;
+opt -full;
 
-# This turns all undriven signals into
-# inputs
-setundef -undriven -expose; opt;
+clean -purge;
 
+setundef -undriven -expose; 
+opt -full;
 
-#write_rtlil
-
-# This writes to a file in BTOR2 format
 write_btor {btor_filename}            
 write_verilog {btor_filename}.v
     """
-
     run_yosys_script(script)
     print(f"Finished writing BTOR2 file to {btor_filename}")
