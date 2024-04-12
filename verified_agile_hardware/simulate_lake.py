@@ -132,8 +132,10 @@ def simulate_mem_tile_counters(
     )
 
     # One for stencil valid
-    sched_gens["stencil_valid"] = SchedGenModel(
-        "stencil_valid", iterator_support=iterator_support, address_width=address_width
+    sched_gens["stencil_valid_sched_gen_sched_addr_gen"] = SchedGenModel(
+        "stencil_valid_sched_gen_sched_addr_gen",
+        iterator_support=iterator_support,
+        address_width=address_width,
     )
 
     addr_gens = {}
@@ -247,32 +249,33 @@ def simulate_mem_tile_counters(
     loops_to_sched_gen["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = (
         "tb_only_loops_buf2out_read_1"
     )
+    loops_to_sched_gen["stencil_valid_sched_gen_sched_addr_gen"] = "loops_stencil_valid"
 
     sched_and_addr_gen_dict = sched_gens.copy()
     sched_and_addr_gen_dict.update(addr_gens)
 
-    if "config" in config and "stencil_valid" in config["config"]:
-        stencil_valid_config = config["config"]["stencil_valid"]
-        lake_configs.append(
-            (
-                "stencil_valid_starting_addr",
-                stencil_valid_config["cycle_starting_addr"][0],
-            )
-        )
-        lake_configs.append(
-            ("stencil_valid_dimensionality", stencil_valid_config["dimensionality"])
-        )
+    # if "config" in config and "stencil_valid" in config["config"]:
+    #     stencil_valid_config = config["config"]["stencil_valid"]
+    #     lake_configs.append(
+    #         (
+    #             "stencil_valid_starting_addr",
+    #             stencil_valid_config["cycle_starting_addr"][0],
+    #         )
+    #     )
+    #     lake_configs.append(
+    #         ("stencil_valid_dimensionality", stencil_valid_config["dimensionality"])
+    #     )
 
-        for i in range(stencil_valid_config["dimensionality"]):
-            lake_configs.append(
-                ("stencil_valid_ranges_" + str(i), stencil_valid_config["extent"][i])
-            )
-            lake_configs.append(
-                (
-                    "stencil_valid_strides_" + str(i),
-                    stencil_valid_config["cycle_stride"][i],
-                )
-            )
+    #     for i in range(stencil_valid_config["dimensionality"]):
+    #         lake_configs.append(
+    #             ("stencil_valid_ranges_" + str(i), stencil_valid_config["extent"][i])
+    #         )
+    #         lake_configs.append(
+    #             (
+    #                 "stencil_valid_strides_" + str(i),
+    #                 stencil_valid_config["cycle_stride"][i],
+    #             )
+    #         )
 
     for addr_gen_name, addr_gen in sched_and_addr_gen_dict.items():
         new_config = {}

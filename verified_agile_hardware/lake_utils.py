@@ -231,7 +231,7 @@ def mem_tile_constraint_generator(
     )
 
     addr_out_to_symbol_name = {}
-    addr_out_to_symbol_name["stencil_valid"] = (
+    addr_out_to_symbol_name["stencil_valid_sched_gen_sched_addr_gen"] = (
         "mem_ctrl_stencil_valid_flat.stencil_valid_inst.stencil_valid_sched_gen.addr_out"
     )
     addr_out_to_symbol_name["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
@@ -254,7 +254,7 @@ def mem_tile_constraint_generator(
     )
 
     dim_out_to_symbol_name = {}
-    dim_out_to_symbol_name["stencil_valid"] = (
+    dim_out_to_symbol_name["stencil_valid_sched_gen_sched_addr_gen"] = (
         "mem_ctrl_stencil_valid_flat.stencil_valid_inst.loops_stencil_valid.dim_counter"
     )
     dim_out_to_symbol_name["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
@@ -491,14 +491,17 @@ def mem_tile_get_num_valids(config, cycles, iterator_support=2, address_width=16
     model_ag.set_config(transformed_config)
 
     cycles_to_idx = []
+    valids = []
     num_valids = 0
 
     for cycle in range(cycles):
         cycles_to_idx.append(num_valids)
         if cycle == model_ag.get_address():
+            valids.append(1)
             num_valids += 1
             model_ag.step()
-
+        else:
+            valids.append(0)
         cycle += 1
 
-    return cycles_to_idx
+    return cycles_to_idx, valids

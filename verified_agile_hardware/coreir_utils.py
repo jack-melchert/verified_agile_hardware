@@ -203,7 +203,16 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay
                 break
         assert strg_ub_vec is not None
 
+        stencil_valid = None
+        for controller in mem_tile.CC.controllers:
+            if controller.name == "stencil_valid":
+                stencil_valid = controller
+                break
+        assert stencil_valid is not None
+
         lake_configs = strg_ub_vec.get_bitstream(metadata["config"])
+        if "stencil_valid" in metadata["config"]:
+            lake_configs += stencil_valid.get_bitstream(metadata["config"])
 
         mode = "UB"
         if "stencil_valid" in metadata["config"]:
