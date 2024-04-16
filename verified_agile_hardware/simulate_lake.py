@@ -13,7 +13,7 @@ class AddresssGeneratorModel:
         self.next_dim = 0
 
         for i in range(self.iterator_support):
-            self.config[f"strides_{i}"] = 1
+            self.config[f"strides_{i}"] = 0
 
     def set_config(self, new_config):
         for key, config_val in new_config.items():
@@ -100,42 +100,42 @@ def simulate_mem_tile_counters(
     # 4 address generator models: 1 for each of the 4 memory controllers
     sched_gens["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = SchedGenModel(
         "agg_only_agg_write_sched_gen_0",
-        iterator_support=iterator_support,
-        address_width=address_width,
+        iterator_support=3,
+        address_width=11,
     )
     sched_gens["sram_tb_shared_output_sched_gen_0_sched_addr_gen"] = SchedGenModel(
         "sram_tb_shared_output_sched_gen_0",
-        iterator_support=iterator_support,
-        address_width=address_width,
+        iterator_support=6,
+        address_width=11,
     )
     sched_gens["tb_only_tb_read_sched_gen_0_sched_addr_gen"] = SchedGenModel(
         "tb_only_tb_read_sched_gen_0",
-        iterator_support=iterator_support,
-        address_width=address_width,
+        iterator_support=6,
+        address_width=11,
     )
 
     # Times 2 for dual ported memory
     sched_gens["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = SchedGenModel(
         "agg_only_agg_write_sched_gen_1",
-        iterator_support=iterator_support,
-        address_width=address_width,
+        iterator_support=3,
+        address_width=11,
     )
     sched_gens["sram_tb_shared_output_sched_gen_1_sched_addr_gen"] = SchedGenModel(
         "sram_tb_shared_output_sched_gen_1",
-        iterator_support=iterator_support,
-        address_width=address_width,
+        iterator_support=6,
+        address_width=11,
     )
     sched_gens["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = SchedGenModel(
         "tb_only_tb_read_sched_gen_1",
-        iterator_support=iterator_support,
-        address_width=address_width,
+        iterator_support=6,
+        address_width=11,
     )
 
     # One for stencil valid
     sched_gens["stencil_valid_sched_gen_sched_addr_gen"] = SchedGenModel(
         "stencil_valid_sched_gen_sched_addr_gen",
-        iterator_support=iterator_support,
-        address_width=address_width,
+        iterator_support=6,
+        address_width=11,
     )
 
     addr_gens = {}
@@ -213,6 +213,14 @@ def simulate_mem_tile_counters(
     sched_gen_to_read_addr_gen["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
         addr_gens["agg_sram_shared_addr_gen_1"]
     )
+    # Doesn't have config for stride but it should be 1
+    for n, v in addr_gens["agg_sram_shared_addr_gen_0"].config.items():
+        if "strides" in n:
+            addr_gens["agg_sram_shared_addr_gen_0"].config[n] = 1
+
+    for n, v in addr_gens["agg_sram_shared_addr_gen_1"].config.items():
+        if "strides" in n:
+            addr_gens["agg_sram_shared_addr_gen_1"].config[n] = 1
 
     sched_gen_to_write_addr_gen = {}
     sched_gen_to_write_addr_gen["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
@@ -253,29 +261,6 @@ def simulate_mem_tile_counters(
 
     sched_and_addr_gen_dict = sched_gens.copy()
     sched_and_addr_gen_dict.update(addr_gens)
-
-    # if "config" in config and "stencil_valid" in config["config"]:
-    #     stencil_valid_config = config["config"]["stencil_valid"]
-    #     lake_configs.append(
-    #         (
-    #             "stencil_valid_starting_addr",
-    #             stencil_valid_config["cycle_starting_addr"][0],
-    #         )
-    #     )
-    #     lake_configs.append(
-    #         ("stencil_valid_dimensionality", stencil_valid_config["dimensionality"])
-    #     )
-
-    #     for i in range(stencil_valid_config["dimensionality"]):
-    #         lake_configs.append(
-    #             ("stencil_valid_ranges_" + str(i), stencil_valid_config["extent"][i])
-    #         )
-    #         lake_configs.append(
-    #             (
-    #                 "stencil_valid_strides_" + str(i),
-    #                 stencil_valid_config["cycle_stride"][i],
-    #             )
-    #         )
 
     for addr_gen_name, addr_gen in sched_and_addr_gen_dict.items():
         new_config = {}

@@ -50,7 +50,7 @@ def test_fts():
 
 
 def test_bmc():
-    solver = Solver()
+    solver = Solver("btor")
 
     bvsort16 = solver.create_bvsort(16)
 
@@ -58,22 +58,57 @@ def test_bmc():
     y = solver.create_fts_state_var("y", bvsort16)
 
     solver.fts.add_invar(
-        solver.create_term(solver.ops.Equal, x, y),
-    )
-
-    prop = pono.Property(
-        solver.solver,
         solver.create_term(
             solver.ops.Not,
             solver.create_term(solver.ops.Equal, x, y),
-        ),
+        )
     )
+    solver.fts.add_invar(
+        solver.create_term(solver.ops.Equal, x, y),
+    )
+
+    prop = pono.Property(solver.solver, solver.create_term(False))
 
     bmc = pono.Bmc(prop, solver.fts, solver.solver)
     res = bmc.check_until(1)
 
+    assert res is None
+
+
+def test_bmc_array():
+    solver = Solver("btor")
+
+    bvsort16 = solver.create_bvsort(16)
+    bvsort1 = solver.create_bvsort(1)
+
+    valids = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1]
+
+    # Create SMT LUT to map cycle count to valid
+    valids_arr = solver.create_fts_state_var(
+        "valids_arr",
+        solver.solver.make_sort(ss.sortkinds.ARRAY, bvsort16, bvsort1),
+    )
+
+    for i, idx in enumerate(valids):
+        valids_arr = solver.create_term(
+            solver.ops.Store,
+            valids_arr,
+            solver.create_const(i, bvsort16),
+            solver.create_const(idx, bvsort1),
+        )
+
+    valid = solver.create_term(solver.ops.Select, valids_arr, solver.bmc_counter)
+
+    property_term = solver.create_term(
+        solver.ops.Equal, valid, solver.create_term(0, bvsort1)
+    )
+
+    prop = pono.Property(solver.solver, property_term)
+
+    bmc = pono.Bmc(prop, solver.fts, solver.solver)
+    res = bmc.check_until(10)
+
     assert res is not None
-    assert not res
 
 
 def test_bmc_terms():
