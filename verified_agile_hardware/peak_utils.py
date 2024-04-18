@@ -10,6 +10,10 @@ from peak.mapper.utils import (
 from peak.family import _RegFamily, SMTFamily
 from peak.black_box import BlackBox
 from collections import defaultdict
+import pysmt
+import pysmt.shortcuts as smt
+from pysmt.typing import BVType, BOOL
+from lassen import PE_fc, Inst_fc
 
 
 def get_aadt(T):
@@ -45,6 +49,7 @@ def create_input(T):
     stripped_input_t = strip_modifiers(T)
     input_aadt_t = family.SMTFamily().get_adt_t(stripped_input_t)
     input_forms, _, _ = SMTForms()(input_aadt_t)
+
     return aadt_product_to_dict(input_forms[0].value)
 
 
@@ -72,7 +77,7 @@ def get_pe_state(solver, pe_name):
     return state_vars
 
 
-def load_pe_tile(solver, PE_fc, pe_name="", out_port_names=()):
+def load_pe_tile(solver, PE_fc, pe_instr, pe_name="", out_port_names=()):
     PE_smt = PE_fc(family.SMTFamily())
 
     pe = PE_smt()
@@ -84,6 +89,11 @@ def load_pe_tile(solver, PE_fc, pe_name="", out_port_names=()):
     recursive_filter_fc(pe, is_bbox, set_bbox_outputs)
 
     inputs = create_input(PE_smt.input_t)
+
+    instr = inputs["inst"]._assembler_.disassemble(pe_instr)
+
+    AsmInst = SMTFamily().get_adt_t(Inst_fc.Py)
+    inputs["inst"] = AsmInst(**instr.value_dict)
     outputs = pe(**inputs)
 
     bboxes = defaultdict(list)
@@ -108,9 +118,9 @@ def load_pe_tile(solver, PE_fc, pe_name="", out_port_names=()):
         else:
             converted_in = solver.convert(val.value)
 
-        mapping[converted_in] = solver.fts.make_inputvar(
-            f"{name}_{pe_name}", converted_in.get_sort()
-        )
+            mapping[converted_in] = solver.fts.make_inputvar(
+                f"{name}_{pe_name}", converted_in.get_sort()
+            )
 
     o = solver.convert(output_val._value_.value)
 

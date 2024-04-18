@@ -80,13 +80,18 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay
                     )
 
     elif tile_type == "global.PE":
+        # To use bitwuzla, we can try packing the PE instuction into this node, and calling the PE smt with the constant
 
         out_port_names = [
             str(out_symbol).split(f"{node}.")[1] for out_symbol in out_symbols
         ]
         pe_name = str(node)
         pe0, bboxes0, pe_inputs = load_pe_tile(
-            solver, PE_fc, pe_name=pe_name, out_port_names=out_port_names
+            solver,
+            PE_fc,
+            pe_instr=data["pe_inst"],
+            pe_name=pe_name,
+            out_port_names=out_port_names,
         )
         solver.bboxes.update(bboxes0)
 
@@ -531,7 +536,34 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay
                 )
 
 
+def pack_pe_constants(graph):
+    # copy of graph
+    graph_copy = graph.copy()
+
+    for node, data in graph_copy.nodes(data=True):
+        if "inst" in data:
+            if data["inst"].module.name == "PE":
+                # get the predecessor nodes
+                for pred in graph.predecessors(node):
+                    # get the edge data
+                    edge_data = graph.get_edge_data(pred, node)
+                    if edge_data["sink_port"] == "inst":
+                        graph.nodes[node].update(
+                            {
+                                "pe_inst": graph.nodes(data=True)[pred]["inst"]
+                                .config["value"]
+                                .value
+                            }
+                        )
+                        graph.remove_edge(pred, node)
+                        graph.remove_node(pred)
+
+                        break
+
+
 def nx_to_smt(graph, interconnect, solver, app_dir=None, io_delay=False):
+    pack_pe_constants(graph)
+
     if not os.path.exists(solver.app_dir):
         os.mkdir(solver.app_dir)
 
