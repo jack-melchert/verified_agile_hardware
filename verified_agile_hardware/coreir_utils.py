@@ -58,26 +58,15 @@ def port_remap_mem(mode, port, port_remap):
     return port
 
 
-def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay=False):
+def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
         assert len(in_symbols) == 1, breakpoint()
 
-        if io_delay:
-            io_val = solver.create_fts_state_var(
-                f"{str(node)}.io_val", in_symbols[0].get_sort()
-            )
-            solver.fts.assign_next(io_val, in_symbols[0])
-
+        for in_symbol in in_symbols:
             for out_symbol in out_symbols:
                 solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, out_symbol, io_val)
+                    solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
                 )
-        else:
-            for in_symbol in in_symbols:
-                for out_symbol in out_symbols:
-                    solver.fts.add_invar(
-                        solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
-                    )
 
     elif tile_type == "global.PE":
 
@@ -531,7 +520,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay
                 )
 
 
-def nx_to_smt(graph, interconnect, solver, app_dir=None, io_delay=False):
+def nx_to_smt(graph, interconnect, solver, app_dir=None):
     if not os.path.exists(solver.app_dir):
         os.mkdir(solver.app_dir)
 
@@ -598,7 +587,7 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None, io_delay=False):
         else:
             tile_type = data["inst"].module.ref_name
 
-        node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay)
+        node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node)
 
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']

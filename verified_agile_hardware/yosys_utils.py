@@ -126,3 +126,59 @@ write_verilog {btor_filename}.v
     """
     run_yosys_script(script)
     print(f"Finished writing BTOR2 file to {btor_filename}")
+
+
+def garnet_tile_to_btor(
+    app_dir="/aha/",
+    garnet_filename="/aha/garnet/garnet.v",
+    garnet_tile_module="Interconnect",
+    btor_filename="garnet.btor2",
+):
+    """Convert a memory tile to a BTOR2 file."""
+    # Check if garnet_filename exists
+    try:
+        with open(garnet_filename, "r") as f:
+            pass
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Could not find {garnet_filename}")
+
+    sv2v_garnet_filename = (
+        app_dir + "/" + os.path.basename(garnet_filename).replace(".sv", ".v")
+    )
+
+    try:
+        with open(sv2v_garnet_filename, "r") as f:
+            pass
+    except FileNotFoundError:
+        sv2v(garnet_filename, sv2v_garnet_filename)
+
+    script = f"""
+read -formal {sv2v_garnet_filename} /aha/garnet/peak_core/CW_fp_add.v /aha/garnet/peak_core/CW_fp_mult.v
+
+prep -top {garnet_tile_module};
+
+hierarchy -check;
+
+chformal -assume -early;
+
+memory -nomap; 
+#opt -full;
+clean -purge;
+
+flatten; 
+#opt -full;
+clean -purge;
+
+clk2fflogic;
+opt -full;
+
+clean -purge;
+
+setundef -undriven -expose; 
+opt -full;
+
+write_btor {btor_filename}            
+write_verilog {btor_filename}.v
+    """
+    run_yosys_script(script)
+    print(f"Finished writing BTOR2 file to {btor_filename}")
