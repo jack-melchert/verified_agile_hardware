@@ -75,6 +75,51 @@ class Solver:
     def assert_formula(self, formula):
         self.solver.assert_formula(formula)
 
+    def create_lut(self, name, lut_vals, idx_sort, elem_sort):
+
+        # array = self.create_fts_state_var(
+        #     name,
+        #     self.solver.make_sort(self.sortkinds.ARRAY, idx_sort, elem_sort),
+        # )
+
+        # for idx, val in lut_vals:
+        #     array = self.create_term(
+        #         self.ops.Store,
+        #         array,
+        #         idx,
+        #         val,
+        #     )
+
+        #     # self.fts.add_invar(
+        #     #     self.create_term(
+        #     #         self.ops.Equal,
+        #     #         val,
+        #     #         self.create_term(
+        #     #             self.ops.Select, array, idx
+        #     #         ),
+        #     #     )
+        #     # )
+
+        # def lut_return_val(select_val):
+        #     return self.create_term(self.ops.Select, array, select_val)
+
+        # Compressing the LUT by removing lut entries that are the same as the index
+
+        def lut_return_val(select_val):
+            ret_val = lut_vals[0][1]
+
+            for idx, val in lut_vals:
+                ret_val = self.create_term(
+                    self.ops.Ite,
+                    self.create_term(self.ops.Equal, idx, select_val),
+                    val,
+                    ret_val,
+                )
+
+            return ret_val
+
+        return lut_return_val
+
     def fts_assert_at_times(self, var, val_at_times, val_at_other_times, times):
         assert len(times) > 0, "Must have at least one time"
 

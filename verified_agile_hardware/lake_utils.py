@@ -72,6 +72,15 @@ def config_rom(solver, mem_name, rom_val):
             solver.create_term(i, index_sort),
             solver.create_term(val, element_sort),
         )
+        # solver.fts.add_invar(
+        #     solver.create_term(
+        #         solver.ops.Equal,
+        #         solver.create_term(
+        #             solver.ops.Select, sram_var, solver.create_const(i, index_sort)
+        #         ),
+        #         solver.create_const(val, element_sort),
+        #     )
+        # )
 
     solver.fts.add_invar(
         solver.create_term(
@@ -323,28 +332,26 @@ def mem_tile_constraint_generator(
 
                 addr_out_type = term.get_sort()
 
-                # Create LUT for addr_out and dim_out
-                addr_out_var = solver.create_fts_state_var(
-                    f"{memtile_name}_{controller}_address_out",
-                    solver.solver.make_sort(
-                        ss.sortkinds.ARRAY, solver.create_bvsort(16), addr_out_type
-                    ),
-                )
-
+                addr_out_lut = []
                 for i, addr in enumerate(addr_out_list):
-                    addr_out_var = solver.create_term(
-                        solver.ops.Store,
-                        addr_out_var,
-                        solver.create_const(i, solver.create_bvsort(16)),
-                        solver.create_const(addr, addr_out_type),
+                    addr_out_lut.append(
+                        (
+                            solver.create_const(i, solver.create_bvsort(16)),
+                            solver.create_const(addr, addr_out_type),
+                        )
                     )
 
-                starting_addr = solver.create_term(
-                    solver.ops.Select, addr_out_var, solver.cycle_count
+                addr_out_var = solver.create_lut(
+                    f"{memtile_name}_{controller}_address_out",
+                    addr_out_lut,
+                    solver.create_bvsort(16),
+                    addr_out_type,
                 )
 
                 solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, term, starting_addr)
+                    solver.create_term(
+                        solver.ops.Equal, term, addr_out_var(solver.cycle_count)
+                    )
                 )
                 break
 
@@ -358,13 +365,7 @@ def mem_tile_constraint_generator(
 
                 dim_cnt_type = term.get_sort()
 
-                # Create LUT for dim_cnt and dim_out
-                dim_cnt_var = solver.create_fts_state_var(
-                    f"{memtile_name}_{controller}_dimemsion_cnt",
-                    solver.solver.make_sort(
-                        ss.sortkinds.ARRAY, solver.create_bvsort(16), dim_cnt_type
-                    ),
-                )
+                dim_out_lut = []
 
                 for i, dim_cnt in enumerate(dim_out_list):
 
@@ -376,19 +377,24 @@ def mem_tile_constraint_generator(
                     for dc_idx, dc in enumerate(dim_cnt):
                         dim_cnt_concat += dc << (dc_idx * dm_sort)
 
-                    dim_cnt_var = solver.create_term(
-                        solver.ops.Store,
-                        dim_cnt_var,
-                        solver.create_const(i, solver.create_bvsort(16)),
-                        solver.create_const(dim_cnt_concat, dim_cnt_type),
+                    dim_out_lut.append(
+                        (
+                            solver.create_const(i, solver.create_bvsort(16)),
+                            solver.create_const(dim_cnt_concat, dim_cnt_type),
+                        )
                     )
 
-                starting_dim_cnt = solver.create_term(
-                    solver.ops.Select, dim_cnt_var, solver.cycle_count
+                starting_dim_cnt = solver.create_lut(
+                    f"{memtile_name}_{controller}_dimemsion_cnt",
+                    dim_out_lut,
+                    solver.create_bvsort(16),
+                    dim_cnt_type,
                 )
 
                 solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, term, starting_dim_cnt)
+                    solver.create_term(
+                        solver.ops.Equal, term, starting_dim_cnt(solver.cycle_count)
+                    )
                 )
                 break
 
@@ -402,28 +408,26 @@ def mem_tile_constraint_generator(
 
                 addr_out_type = term.get_sort()
 
-                # Create LUT for addr_out and dim_out
-                addr_out_var = solver.create_fts_state_var(
-                    f"{memtile_name}_{controller}_read_address_out",
-                    solver.solver.make_sort(
-                        ss.sortkinds.ARRAY, solver.create_bvsort(16), addr_out_type
-                    ),
-                )
-
+                addr_out_lut = []
                 for i, addr in enumerate(addr_out_list):
-                    addr_out_var = solver.create_term(
-                        solver.ops.Store,
-                        addr_out_var,
-                        solver.create_const(i, solver.create_bvsort(16)),
-                        solver.create_const(addr, addr_out_type),
+                    addr_out_lut.append(
+                        (
+                            solver.create_const(i, solver.create_bvsort(16)),
+                            solver.create_const(addr, addr_out_type),
+                        )
                     )
 
-                starting_addr = solver.create_term(
-                    solver.ops.Select, addr_out_var, solver.cycle_count
+                addr_out_var = solver.create_lut(
+                    f"{memtile_name}_{controller}_read_address_out",
+                    addr_out_lut,
+                    solver.create_bvsort(16),
+                    addr_out_type,
                 )
 
                 solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, term, starting_addr)
+                    solver.create_term(
+                        solver.ops.Equal, term, addr_out_var(solver.cycle_count)
+                    )
                 )
 
                 break
@@ -438,28 +442,26 @@ def mem_tile_constraint_generator(
 
                 addr_out_type = term.get_sort()
 
-                # Create LUT for addr_out and dim_out
-                addr_out_var = solver.create_fts_state_var(
-                    f"{memtile_name}_{controller}_write_address_out",
-                    solver.solver.make_sort(
-                        ss.sortkinds.ARRAY, solver.create_bvsort(16), addr_out_type
-                    ),
-                )
-
+                addr_out_lut = []
                 for i, addr in enumerate(addr_out_list):
-                    addr_out_var = solver.create_term(
-                        solver.ops.Store,
-                        addr_out_var,
-                        solver.create_const(i, solver.create_bvsort(16)),
-                        solver.create_const(addr, addr_out_type),
+                    addr_out_lut.append(
+                        (
+                            solver.create_const(i, solver.create_bvsort(16)),
+                            solver.create_const(addr, addr_out_type),
+                        )
                     )
 
-                starting_addr = solver.create_term(
-                    solver.ops.Select, addr_out_var, solver.cycle_count
+                addr_out_var = solver.create_lut(
+                    f"{memtile_name}_{controller}_write_address_out",
+                    addr_out_lut,
+                    solver.create_bvsort(16),
+                    addr_out_type,
                 )
 
                 solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, term, starting_addr)
+                    solver.create_term(
+                        solver.ops.Equal, term, addr_out_var(solver.cycle_count)
+                    )
                 )
                 break
 
