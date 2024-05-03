@@ -58,26 +58,15 @@ def port_remap_mem(mode, port, port_remap):
     return port
 
 
-def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay=False):
+def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
         assert len(in_symbols) == 1, breakpoint()
 
-        if io_delay:
-            io_val = solver.create_fts_state_var(
-                f"{str(node)}.io_val", in_symbols[0].get_sort()
-            )
-            solver.fts.assign_next(io_val, in_symbols[0])
-
+        for in_symbol in in_symbols:
             for out_symbol in out_symbols:
                 solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, out_symbol, io_val)
+                    solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
                 )
-        else:
-            for in_symbol in in_symbols:
-                for out_symbol in out_symbols:
-                    solver.fts.add_invar(
-                        solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
-                    )
 
     elif tile_type == "global.PE":
         # To use bitwuzla, we can try packing the PE instuction into this node, and calling the PE smt with the constant
@@ -548,13 +537,20 @@ def pack_pe_constants(graph):
                     # get the edge data
                     edge_data = graph.get_edge_data(pred, node)
                     if edge_data["sink_port"] == "inst":
-                        graph.nodes[node].update(
-                            {
-                                "pe_inst": graph.nodes(data=True)[pred]["inst"]
-                                .config["value"]
-                                .value
-                            }
-                        )
+
+                        if "value" in graph.nodes(data=True)[pred]:
+                            graph.nodes[node].update(
+                                {"pe_inst": graph.nodes(data=True)[pred]["value"]}
+                            )
+                        else:
+                            graph.nodes[node].update(
+                                {
+                                    "pe_inst": graph.nodes(data=True)[pred]["inst"]
+                                    .config["value"]
+                                    .value
+                                }
+                            )
+
                         graph.remove_edge(pred, node)
                         graph.remove_node(pred)
 
@@ -630,7 +626,7 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None, io_delay=False):
         else:
             tile_type = data["inst"].module.ref_name
 
-        node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node, io_delay)
+        node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node)
 
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
@@ -723,7 +719,7 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):
                 g.add_node(
                     str(node) + "_inst",
                     node_type="pnr_const",
-                    value=instance_to_instr[name].value,
+                    value=instance_to_instr[name],
                     node_name=str(node) + "_inst",
                 )
                 source_port = "out"
@@ -805,8 +801,13 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):
 
     for node in pmod.get_input_ios():
         if node.tile_id[0] == "I":
+            bitwidth = int(node.tile_type.name.split("IO")[1])
             g.add_edge(
-                "in", str(node), source_port=str(node), sink_port="out", bitwidth=17
+                "in",
+                str(node),
+                source_port=str(node),
+                sink_port="out",
+                bitwidth=bitwidth,
             )
         else:
             g.add_edge(
@@ -815,8 +816,13 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):
 
     for node in pmod.get_output_ios():
         if node.tile_id[0] == "I":
+            bitwidth = int(node.tile_type.name.split("IO")[1])
             g.add_edge(
-                str(node), "out", source_port="out", sink_port=str(node), bitwidth=17
+                str(node),
+                "out",
+                source_port="out",
+                sink_port=str(node),
+                bitwidth=bitwidth,
             )
         else:
             g.add_edge(
