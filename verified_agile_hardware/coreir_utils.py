@@ -557,9 +557,7 @@ def pack_pe_constants(graph):
                         break
 
 
-def nx_to_smt(graph, interconnect, solver, app_dir=None, io_delay=False):
-    pack_pe_constants(graph)
-
+def nx_to_smt(graph, interconnect, solver, app_dir=None):
     if not os.path.exists(solver.app_dir):
         os.mkdir(solver.app_dir)
 
