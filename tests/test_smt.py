@@ -140,6 +140,34 @@ def test_bmc_terms():
     assert not res
 
 
+def test_input_var():
+    solver = Solver()
+
+    bvsort16 = solver.create_bvsort(16)
+
+    y = solver.create_fts_state_var("y", bvsort16)
+    y_in = solver.create_fts_input_var("y_in", bvsort16)
+
+    solver.fts.constrain_init(
+        solver.create_term(solver.ops.Equal, y, solver.create_term(0, bvsort16))
+    )
+
+    solver.fts.assign_next(y, y_in)
+
+    prop = pono.Property(
+        solver.solver,
+        solver.create_term(solver.ops.Equal, y, solver.create_term(0, bvsort16)),
+    )
+
+    bmc = pono.Bmc(prop, solver.fts, solver.solver)
+    res = bmc.check_until(10)
+
+    for w in bmc.witness():
+        print(w)
+
+    assert res is None or res
+
+
 def test_bmc_input_var():
     solver = Solver()
 

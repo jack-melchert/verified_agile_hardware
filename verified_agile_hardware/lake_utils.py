@@ -111,6 +111,13 @@ def produce_configed_memtile_verilog(
         else:
             outputs_and_bw.append((name, bw, packed, size))
 
+    # Setting all unused inputs to 0 for some reason causes the memtiles to misbehave
+    # for in_, bw, packed, size in inputs_and_bw:
+    #     if in_ in config_dict or in_ in used_inputs:
+    #         continue
+    #     config_dict[in_] = 0
+
+    # Module definition
     verilog = f"""module {mem_name} (\n"""
 
     for in_, bw, packed, size in inputs_and_bw:
@@ -133,6 +140,7 @@ def produce_configed_memtile_verilog(
 
     verilog += ");\n"
 
+    # Wire instantiation
     for in_, bw, packed, size in inputs_and_bw:
         if in_ in config_dict or in_ in used_inputs:
             continue
@@ -151,6 +159,7 @@ def produce_configed_memtile_verilog(
         else:
             verilog += f"wire [{bw-1}:0] {out_};\n"
 
+    # Memtile instantiation
     verilog += f"{mem_tile.dut.name} {mem_tile.dut.name}_{mem_name} (\n"
 
     for in_, bw, packed, size in inputs_and_bw:
@@ -177,7 +186,7 @@ def load_new_mem_tile(
         solver.app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs
     )
 
-    unique = solver.num_memtiles + 12345  # this is stupid
+    unique = solver.num_memtiles + 999  # this is stupid
     solver.num_memtiles += 1
 
     btor_file_t = f"{solver.app_dir}/{mem_name}_configed_temp.btor"

@@ -627,6 +627,12 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
             tile_type = data["inst"].module.ref_name
 
         node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node)
+        print(
+            f"Finished node {node}",
+            len(solver.fts.named_terms),
+            len(solver.fts.statevars),
+            len(str(solver.fts.trans)),
+        )
 
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
@@ -634,6 +640,7 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
         solver.fts.add_invar(
             solver.create_term(solver.ops.Equal, source_symbol, sink_symbol)
         )
+
     return solver, node_symbols["in"], node_symbols["out"]
 
 
