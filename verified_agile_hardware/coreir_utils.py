@@ -234,12 +234,11 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         config_dict["tile_en"] = 1
         config_dict["clk_en"] = 1
 
-        if mode == "ROM":
-            mode_val = 2
-            mode_excl_val = 0
-        else:
-            mode_val = 1
-            mode_excl_val = 1
+        ctrl_mode = mem_tile.dut.get_mode_map()[mode].name
+        mode_map = mem_tile.dut.ctrl_to_mode
+
+        mode_val = mode_map[ctrl_mode][0]
+        mode_excl_val = 1 if mode_map[ctrl_mode][1] == "excl" else 0
 
         config_dict["mode"] = mode_val
         config_dict["mode_excl"] = mode_excl_val
@@ -627,12 +626,6 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
             tile_type = data["inst"].module.ref_name
 
         node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node)
-        print(
-            f"Finished node {node}",
-            len(solver.fts.named_terms),
-            len(solver.fts.statevars),
-            len(str(solver.fts.trans)),
-        )
 
     for source, sink, data in graph.edges(data=True):
         source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']

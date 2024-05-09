@@ -186,7 +186,7 @@ def load_new_mem_tile(
         solver.app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs
     )
 
-    unique = solver.num_memtiles + 999  # this is stupid
+    unique = solver.num_memtiles + 12345  # this is stupid
     solver.num_memtiles += 1
 
     btor_file_t = f"{solver.app_dir}/{mem_name}_configed_temp.btor"
