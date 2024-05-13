@@ -5,9 +5,7 @@ import os
 
 
 class Solver:
-    def __init__(
-        self, solver_name="cvc5"
-    ):  # btor only 141.4193 cvc5 btor 89.260682582 btor btor 134.27
+    def __init__(self, solver_name="btor"):
         self.fe_solver = fe.Solver(solver_name)
         self.solver = self.fe_solver.solver
         self.solver.set_opt("incremental", "true")
@@ -30,6 +28,7 @@ class Solver:
         self.stencil_valid_to_schedule = {}
         self.id_to_name = {}
         self.max_cycles = 100
+        self.starting_cycle = 0
         self.cycle_count = self.fts.make_statevar(
             "cycle_count", self.solver.make_sort(ss.sortkinds.BV, 16)
         )

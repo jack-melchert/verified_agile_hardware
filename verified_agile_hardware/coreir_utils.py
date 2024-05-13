@@ -60,7 +60,7 @@ def port_remap_mem(mode, port, port_remap):
 
 def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
     if tile_type == "global.IO" or tile_type == "global.BitIO":
-        assert len(in_symbols) == 1, breakpoint()
+        assert len(in_symbols) == 1
 
         for in_symbol in in_symbols:
             for out_symbol in out_symbols:
@@ -265,6 +265,15 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
             solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
         )
 
+        flush_offset = 0
+        if "y" in data:
+            if data["y"] == 0 or solver.interconnect.pipeline_config_interval == 0:
+                flush_offset = 0
+            else:
+                flush_offset = (
+                    data["y"] - 1
+                ) // solver.interconnect.pipeline_config_interval
+
         mem_tile_constraint_generator(
             solver,
             mem_name,
@@ -272,6 +281,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
             lake_configs,
             solver.max_cycles,
             iterator_support=6,
+            flush_offset=flush_offset,
         )
 
         used_mem_inputs = []
@@ -516,12 +526,14 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         solver.fts.add_invar(
             solver.create_term(solver.ops.Equal, out_symbols[0], const)
         )
-    else:  # if it's a route node, do the same thing as for I/O nodes
+    elif tile_type == "route":  # it's a pnr route node
         for in_symbol in in_symbols:
             for out_symbol in out_symbols:
                 solver.fts.add_invar(
                     solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
                 )
+    else:
+        raise NotImplementedError(f"Tile type {tile_type} not implemented")
 
 
 def pack_pe_constants(graph):
@@ -703,57 +715,62 @@ def pnr_to_nx(pmod, cmod, instance_to_instr):
     for node in pmod.nodes:
         if node in pmod.get_tiles():
             name = pmod.id_to_name[str(node)]
+
+            # if node is a tile node, map to instructions
+            if name in node_to_inst_dict.keys():
+                # add the node itself
+                g.add_node(
+                    str(node),
+                    inst=node_to_inst_dict[name],
+                    node_type="tile",
+                    node_name=name,
+                    y=node.y,
+                )
+
+                # add the instructions for PEs
+                if node in pmod.get_pes():
+                    g.add_node(
+                        str(node) + "_inst",
+                        node_type="pnr_const",
+                        value=instance_to_instr[name],
+                        node_name=str(node) + "_inst",
+                    )
+                    source_port = "out"
+                    sink_port = "inst"
+                    bitwidth = instance_to_instr[name].size
+                    g.add_edge(
+                        str(node) + "_inst",
+                        str(node),
+                        source_port=source_port,
+                        sink_port=sink_port,
+                        bitwidth=bitwidth,
+                    )
+                    # add clk enable of the node
+                    g.add_node(
+                        str(node) + "_clk_en",
+                        node_type="pnr_const",
+                        value=1,
+                        node_name=str(node) + "_clk_en",
+                    )
+                    source_port = "out"
+                    sink_port = "clk_en"
+                    bitwidth = 1
+                    g.add_edge(
+                        str(node) + "_clk_en",
+                        str(node),
+                        source_port=source_port,
+                        sink_port=sink_port,
+                        bitwidth=bitwidth,
+                    )
+            else:
+                # Register
+                g.add_node(
+                    str(node),
+                    node_type="coreir.reg",
+                    node_name=name,
+                )
         else:
-            name = str(node)
-        # if node is a tile node, map to instructions
-        if name in node_to_inst_dict.keys():
-            # add the node itself
-            g.add_node(
-                str(node),
-                inst=node_to_inst_dict[name],
-                node_type="tile",
-                node_name=name,
-            )
-            # add the instructions of the node
-            if node in pmod.get_pes():
-                g.add_node(
-                    str(node) + "_inst",
-                    node_type="pnr_const",
-                    value=instance_to_instr[name],
-                    node_name=str(node) + "_inst",
-                )
-                source_port = "out"
-                sink_port = "inst"
-                bitwidth = instance_to_instr[name].size
-                g.add_edge(
-                    str(node) + "_inst",
-                    str(node),
-                    source_port=source_port,
-                    sink_port=sink_port,
-                    bitwidth=bitwidth,
-                )
-                # add clk enable of the node
-                g.add_node(
-                    str(node) + "_clk_en",
-                    node_type="pnr_const",
-                    value=1,
-                    node_name=str(node) + "_clk_en",
-                )
-                source_port = "out"
-                sink_port = "clk_en"
-                bitwidth = 1
-                g.add_edge(
-                    str(node) + "_clk_en",
-                    str(node),
-                    source_port=source_port,
-                    sink_port=sink_port,
-                    bitwidth=bitwidth,
-                )
-        else:  # if node is a route node, add to graph directly
-            g.add_node(str(node), node_type="route", node_name=name)
-            assert (
-                node not in pmod.get_tiles() or node in pmod.get_regs()
-            ), f"Tile node that's not register {name} claimed as route node"
+            g.add_node(str(node), node_type="route", node_name=str(node))
 
     for edge in pmod.edges:
         # edge[0] = source, edge[1] = sink

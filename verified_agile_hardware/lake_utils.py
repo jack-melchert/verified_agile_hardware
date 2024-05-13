@@ -241,7 +241,13 @@ def load_new_mem_tile(
 
 
 def mem_tile_constraint_generator(
-    solver, memtile_name, config_dict, lake_configs, cycles, iterator_support=2
+    solver,
+    memtile_name,
+    config_dict,
+    lake_configs,
+    cycles,
+    iterator_support=2,
+    flush_offset=0,
 ):
 
     # if "port_controller" not in memtile_name:
@@ -250,6 +256,19 @@ def mem_tile_constraint_generator(
     addr_out, dim_out, read_addr_out, write_addr_out = simulate_mem_tile_counters(
         config_dict, lake_configs, cycles, iterator_support
     )
+
+    for controller, addr_out_list in addr_out.items():
+        addr_out[controller] = [0] * flush_offset + addr_out_list
+
+    for controller, addr_out_list in dim_out.items():
+        pad = [0] * len(addr_out_list[0])
+        dim_out[controller] = [pad] * flush_offset + addr_out_list
+
+    for controller, addr_out_list in read_addr_out.items():
+        read_addr_out[controller] = [0] * flush_offset + addr_out_list
+
+    for controller, addr_out_list in write_addr_out.items():
+        write_addr_out[controller] = [0] * flush_offset + addr_out_list
 
     addr_out_to_symbol_name = {}
     addr_out_to_symbol_name["stencil_valid_sched_gen_sched_addr_gen"] = (
