@@ -18,6 +18,7 @@ from verified_agile_hardware.lake_utils import (
     load_new_mem_tile,
     config_rom,
     mem_tile_constraint_generator,
+    pond_tile_constraint_generator,
 )
 
 
@@ -45,6 +46,9 @@ def port_remap_mem(mode, port, port_remap):
         }
         if port in hack_remap:
             port = hack_remap[port]
+
+    if mode == "pond":
+        port = port.replace("pond_", "")
 
     if mode == "stencil_valid":
         if "stencil_valid" in port:
@@ -261,6 +265,10 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
             for out_symbol in out_symbols
         ]
 
+        if mode == "ROM":
+            rom_wen_port = port_remap["ROM"]["wen"]
+            used_inputs.append(rom_wen_port)
+
         mem_inputs, mem_outputs = load_new_mem_tile(
             solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
         )
@@ -380,18 +388,36 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
             config_rom(solver, mem_name, metadata["init"])
 
     elif tile_type == "cgralib.Pond":
-        pond_name = data["inst"].name
+        pond_name = str(node)
 
         # Need to configure pond here
+        metadata = data["inst"].metadata
         pond_tile = solver.interconnect.tile_circuits[(0, 1)].additional_cores[0]
         config = pond_tile.get_config_bitstream(data["inst"].metadata)
+
+        mode = metadata["mode"]
+        if "mode" in metadata and metadata["mode"] == "sram":
+            mode = "ROM"
+            # ROM values embedded in config, we want to remove those
+            config = [c for c in config if len(c) == 2]
+
+        ctrl_mode = pond_tile.dut.get_mode_map()[mode].name
+        mode_map = pond_tile.dut.ctrl_to_mode
+        strg_ub_vec = None
+        for controller in pond_tile.dut.controllers:
+            if controller.name == "strg_ub_thin_PondTop":
+                strg_ub_vec = controller
+                break
+        assert strg_ub_vec is not None
+
+        lake_configs = strg_ub_vec.get_bitstream(metadata["config"])
+
+        port_remap = pond_tile.get_port_remap()
 
         # About to do something dumb
         # sort config by the first number of the tuple
         config = sorted(config, key=lambda x: x[0])
-        registers = (
-            solver.interconnect.tile_circuits[(0, 1)].additional_cores[0].registers
-        )
+        registers = pond_tile.registers
         # Sort config inputs by the key
         config_inputs = {
             n.split(f"_{pond_name}")[0]: v
@@ -400,42 +426,82 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         }
         config_inputs = sorted(config_inputs.items(), key=lambda x: x[0])
 
+        config_dict = {c1[0]: c0[1] for c0, c1 in zip(config, config_inputs)}
+
+        config_dict["tile_en"] = 1
+        config_dict["clk_en"] = 1
+
+        mode_val = mode_map[ctrl_mode][0]
+        mode_excl_val = 1 if mode_map[ctrl_mode][1] == "excl" else 0
+
+        config_dict["mode"] = mode_val
+        config_dict["mode_excl"] = mode_excl_val
+
+        config_dict["config_addr_in"] = 0
+        config_dict["config_data_in"] = 0
+        config_dict["config_en"] = 0
+        config_dict["config_read"] = 0
+        config_dict["config_write"] = 0
+
+        # config_dict["flush"] = 0
+        config_dict["rst_n"] = 1
+
+        used_inputs = [
+            port_remap_mem(mode, str(in_symbol).split(f"{pond_name}.")[1], port_remap)
+            for in_symbol in in_symbols
+        ]
+        used_outputs = [
+            port_remap_mem(mode, str(out_symbol).split(f"{pond_name}.")[1], port_remap)
+            for out_symbol in out_symbols
+        ]
+
+        if mode == "ROM":
+            rom_wen_port = port_remap["ROM"]["wen"]
+            used_inputs.append(rom_wen_port)
+
         pond_inputs, pond_outputs = load_new_mem_tile(
-            solver, pond_name, pond_tile, zip(config, config_inputs)
+            solver, pond_name, pond_tile, config_dict, used_inputs, used_outputs
+        )
+
+        flush_offset = 0
+        if "y" in data:
+            if data["y"] == 0 or solver.interconnect.pipeline_config_interval == 0:
+                flush_offset = 0
+            else:
+                flush_offset = (
+                    data["y"] - 1
+                ) // solver.interconnect.pipeline_config_interval
+
+        pond_tile_constraint_generator(
+            solver,
+            pond_name,
+            metadata,
+            lake_configs,
+            solver.max_cycles,
+            iterator_support=6,
+            flush_offset=flush_offset,
         )
 
         used_pond_inputs = []
 
         # Reset, clock, and flush
-        solver.rsts.append(pond_inputs[f"rst_n_{pond_name}"])
-        used_pond_inputs.append(pond_inputs[f"rst_n_{pond_name}"])
+        # solver.rsts.append(pond_inputs[f"rst_n_{pond_name}"])
+        # used_pond_inputs.append(pond_inputs[f"rst_n_{pond_name}"])
         solver.clks.append(pond_inputs[f"clk_{pond_name}"])
         used_pond_inputs.append(pond_inputs[f"clk_{pond_name}"])
         solver.flushes.append(pond_inputs[f"flush_{pond_name}"])
         used_pond_inputs.append(pond_inputs[f"flush_{pond_name}"])
 
-        solver.fts.add_invar(
-            solver.create_term(
-                solver.ops.Equal,
-                pond_inputs[f"tile_en_{pond_name}"],
-                solver.create_const(1, solver.create_bvsort(1)),
-            )
-        )
-        used_pond_inputs.append(pond_inputs[f"tile_en_{pond_name}"])
-
-        # Annoying port remapping stuff here
-        port_remap = pond_tile.get_port_remap()
-
-        port_remap = port_remap["pond"]
-
         for in_symbol in in_symbols:
-            port = str(in_symbol).split(f"{data['inst'].name}.")[1]
-            port = port.replace("_pond_", "_")
+            port = str(in_symbol).split(f"{pond_name}.")[1]
 
-            if port in port_remap:
-                port = port_remap[port]
+            port = port_remap_mem(mode, port, port_remap)
 
             in_symbol_width = in_symbol.get_sort().get_width()
+
+            if f"{port}_{pond_name}" not in pond_inputs:
+                continue
+
             if (
                 in_symbol_width
                 == pond_inputs[f"{port}_{pond_name}"].get_sort().get_width()
@@ -456,6 +522,19 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
             )
             used_pond_inputs.append(mem_input)
 
+        # Need to tie wen to 0 for ROMs, this is usually handled in the connection box
+        # But we just have to emulate that behavior here
+        if mode == "ROM":
+            rom_wen_port = port_remap["ROM"]["wen"]
+            wen_port = pond_inputs[f"{rom_wen_port}_{pond_name}"]
+            solver.fts.add_invar(
+                solver.create_term(
+                    solver.ops.Equal,
+                    wen_port,
+                    solver.create_const(0, wen_port.get_sort()),
+                )
+            )
+
         unused_pond_inputs = {
             k: v for k, v in pond_inputs.items() if v not in used_pond_inputs
         }
@@ -469,19 +548,18 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                 )
 
         for out_symbol in out_symbols:
-            port = str(out_symbol).split(f"{data['inst'].name}.")[1]
-            port = port.replace("_pond_", "_")
-            if port in port_remap:
-                port = port_remap[port]
+            port = str(out_symbol).split(f"{pond_name}.")[1]
+
+            port = port_remap_mem(mode, port, port_remap)
 
             out_symbol_width = out_symbol.get_sort().get_width()
             if (
                 out_symbol_width
                 == pond_outputs[f"{port}_{pond_name}"].get_sort().get_width()
             ):
-                mem_output = pond_outputs[f"{port}_{pond_name}"]
+                pond_output = pond_outputs[f"{port}_{pond_name}"]
             else:
-                mem_output = solver.fts.make_term(
+                pond_output = solver.fts.make_term(
                     ss.Op(ss.primops.Extract, out_symbol_width - 1, 0),
                     pond_outputs[f"{port}_{pond_name}"],
                 )
@@ -490,9 +568,13 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                 solver.create_term(
                     solver.ops.Equal,
                     out_symbol,
-                    mem_output,
+                    pond_output,
                 )
             )
+
+        if mode == "ROM":
+            assert "init" in metadata
+            config_rom(solver, pond_name, metadata["init"])
 
     elif tile_type == "coreir.reg" or tile_type == "corebit.reg":
         name = str(node)

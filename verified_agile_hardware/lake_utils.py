@@ -1,7 +1,10 @@
 from verified_agile_hardware.solver import Solver, Rewriter
-from verified_agile_hardware.yosys_utils import mem_tile_to_btor
+from verified_agile_hardware.yosys_utils import mem_tile_to_btor, sv2v
 from verified_agile_hardware.configure_mem_tile import MemtileConfig
-from verified_agile_hardware.simulate_lake import simulate_mem_tile_counters
+from verified_agile_hardware.simulate_lake import (
+    simulate_mem_tile_counters,
+    simulate_pond_tile_counters,
+)
 from _kratos import create_wrapper_flatten
 from lake.models.addr_gen_model import AddrGenModel
 import os
@@ -66,27 +69,23 @@ def config_rom(solver, mem_name, rom_val):
             )
 
     for i, val in enumerate(packed_rom_val):
-        sram_var = solver.create_term(
-            solver.ops.Store,
-            sram_var,
-            solver.create_term(i, index_sort),
-            solver.create_term(val, element_sort),
+        solver.fts.add_invar(
+            solver.create_term(
+                solver.ops.Equal,
+                solver.create_term(
+                    solver.ops.Select, sram_var, solver.create_const(i, index_sort)
+                ),
+                solver.create_const(val, element_sort),
+            )
         )
-        # solver.fts.add_invar(
-        #     solver.create_term(
-        #         solver.ops.Equal,
-        #         solver.create_term(
-        #             solver.ops.Select, sram_var, solver.create_const(i, index_sort)
-        #         ),
-        #         solver.create_const(val, element_sort),
-        #     )
-        # )
 
-    solver.fts.add_invar(
-        solver.create_term(
-            solver.ops.Equal, sram_var, get_mem_sram_var(solver, mem_name)
-        )
-    )
+    for name, term in solver.fts.named_terms.items():
+        if "r_w_seq_current_state" in name and mem_name in name:
+            solver.fts.constrain_init(
+                solver.create_term(
+                    solver.ops.Equal, term, solver.create_const(0, term.get_sort())
+                )
+            )
 
 
 def produce_configed_memtile_verilog(
@@ -178,12 +177,114 @@ def produce_configed_memtile_verilog(
         f.write(verilog)
 
 
+def produce_configed_simulation_memtile_verilog(
+    app_dir, mem_tile, config_dict, mem_name
+):
+
+    if "rst_n" in config_dict:
+        del config_dict["rst_n"]
+
+    # always used
+    used_inputs = ["clk", "flush", "rst_n"]
+    used_outputs = []
+
+    # I cant get kratos to behave so I'll codegen raw verilog
+    inputs_and_bw = []
+    outputs_and_bw = []
+
+    for port in mem_tile.dut.ports:
+        direction = mem_tile.dut.ports[port].port_direction
+        bw = mem_tile.dut.ports[port].width
+        name = mem_tile.dut.ports[port].name
+        packed = mem_tile.dut.ports[port].is_packed
+        size = mem_tile.dut.ports[port].size[0]
+        if direction == kts.PortDirection.In:
+            inputs_and_bw.append((name, bw, packed, size))
+        else:
+            outputs_and_bw.append((name, bw, packed, size))
+
+    # Setting all unused inputs to 0 for some reason causes the memtiles to misbehave
+    for in_, bw, packed, size in inputs_and_bw:
+        if in_ in config_dict or in_ in used_inputs:
+            continue
+        config_dict[in_] = 0
+
+    # Module definition
+    verilog = f"""module {mem_name} (\n"""
+
+    for in_, bw, packed, size in inputs_and_bw:
+        if in_ in config_dict or in_ not in used_inputs:
+            continue
+        # in_ += f"_{mem_name}"
+        if packed:
+            verilog += f"input wire [{size-1}:0] [{bw-1}:0] {in_},\n"
+        else:
+            verilog += f"input wire [{bw-1}:0] {in_},\n"
+
+    for out_, bw, packed, size in outputs_and_bw:
+        if out_ not in used_outputs:
+            continue
+        # out_ += f"_{mem_name}"
+        if packed:
+            verilog += f"output wire [{size-1}:0] [{bw-1}:0] {out_},\n"
+        else:
+            verilog += f"output wire [{bw-1}:0] {out_},\n"
+
+    verilog += ");\n"
+
+    # Wire instantiation
+    for in_, bw, packed, size in inputs_and_bw:
+        if in_ in config_dict or in_ in used_inputs:
+            continue
+        # in_ += f"_{mem_name}"
+        if packed:
+            verilog += f"wire [{size-1}:0] [{bw-1}:0] {in_};\n"
+        else:
+            verilog += f"wire [{bw-1}:0] {in_};\n"
+
+    for out_, bw, packed, size in outputs_and_bw:
+        if out_ in used_outputs:
+            continue
+        # out_ += f"_{mem_name}"
+        if packed:
+            verilog += f"wire [{size-1}:0] [{bw-1}:0] {out_};\n"
+        else:
+            verilog += f"wire [{bw-1}:0] {out_};\n"
+
+    # Memtile instantiation
+    verilog += f"{mem_tile.dut.name} {mem_tile.dut.name} (\n"
+
+    for in_, bw, packed, size in inputs_and_bw:
+        if in_ in config_dict:
+            verilog += f".{in_}({bw}'d{config_dict[in_]}),\n"
+        else:
+            verilog += f".{in_}({in_}),\n"
+
+    for in_, bw, packed, size in outputs_and_bw:
+        verilog += f".{in_}({in_}),\n"
+
+    verilog += ");\n"
+    verilog += "endmodule\n"
+
+    with open(f"{app_dir}/{mem_name}_simulation.sv", "w") as f:
+        f.write(verilog)
+
+
 def load_new_mem_tile(
     solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
 ):
     # Write kratos config_dict to configure mem tile
     produce_configed_memtile_verilog(
         solver.app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs
+    )
+
+    produce_configed_simulation_memtile_verilog(
+        solver.app_dir, mem_tile, config_dict, mem_name
+    )
+
+    sv2v(
+        f"{solver.app_dir}/{mem_name}_simulation.sv",
+        f"{solver.app_dir}/{mem_name}_simulation.v",
     )
 
     unique = solver.num_memtiles + 12345  # this is stupid
@@ -525,3 +626,105 @@ def mem_tile_get_num_valids(config, cycles, iterator_support=2, address_width=16
         cycle += 1
 
     return cycles_to_idx, valids
+
+
+def pond_tile_constraint_generator(
+    solver,
+    pond_name,
+    config_dict,
+    lake_configs,
+    cycles,
+    iterator_support=2,
+    flush_offset=0,
+):
+
+    addr_out = simulate_pond_tile_counters(
+        solver.app_dir,
+        pond_name,
+        config_dict,
+        lake_configs,
+        cycles,
+        iterator_support,
+        solver.max_cycles,
+    )
+
+    for controller, addr_out_list in addr_out.items():
+        addr_out[controller] = [0] * flush_offset + addr_out_list
+
+    for controller, addr_out_list in addr_out.items():
+        for name, term in solver.fts.named_terms.items():
+            if (
+                controller in name
+                and pond_name in name
+                and not solver.fts.is_next_var(term)
+            ):
+
+                print("Adding pond addr out constraint", controller, name)
+                addr_out_type = term.get_sort()
+
+                addr_out_lut = []
+                for i, addr in enumerate(addr_out_list):
+                    addr_out_lut.append(
+                        (
+                            solver.create_const(i, solver.create_bvsort(16)),
+                            solver.create_const(addr, addr_out_type),
+                        )
+                    )
+
+                addr_out_var = solver.create_lut(
+                    f"{pond_name}_{controller}_address_out",
+                    addr_out_lut,
+                    solver.create_bvsort(16),
+                    addr_out_type,
+                )
+
+                solver.fts.add_invar(
+                    solver.create_term(
+                        solver.ops.Equal, term, addr_out_var(solver.cycle_count)
+                    )
+                )
+                break
+
+    # for controller, dim_out_list in dim_out.items():
+    #     for name, term in solver.fts.named_terms.items():
+    #         if (
+    #             dim_out_to_symbol_name[controller] in name
+    #             and pond_name in name
+    #             and not solver.fts.is_next_var(term)
+    #         ):
+
+    #             print("Adding pond dim count constraint", controller, name)
+    #             dim_cnt_type = term.get_sort()
+
+    #             dim_out_lut = []
+
+    #             for i, dim_cnt in enumerate(dim_out_list):
+
+    #                 dm_sort = dim_cnt_type.get_width() // len(dim_cnt)
+
+    #                 dim_cnt_concat = 0
+
+    #                 # for dc_idx, dc in enumerate(reversed(dim_cnt)):
+    #                 for dc_idx, dc in enumerate(dim_cnt):
+    #                     dim_cnt_concat += dc << (dc_idx * dm_sort)
+
+    #                 dim_out_lut.append(
+    #                     (
+    #                         solver.create_const(i, solver.create_bvsort(16)),
+    #                         solver.create_const(dim_cnt_concat, dim_cnt_type),
+    #                     )
+    #                 )
+
+    #             starting_dim_cnt = solver.create_lut(
+    #                 f"{pond_name}_{controller}_dimemsion_cnt",
+    #                 dim_out_lut,
+    #                 solver.create_bvsort(16),
+    #                 dim_cnt_type,
+    #             )
+
+    #             solver.fts.add_invar(
+    #                 solver.create_term(
+    #                     solver.ops.Equal, term, starting_dim_cnt(solver.cycle_count)
+    #                 )
+    #             )
+    #             break
