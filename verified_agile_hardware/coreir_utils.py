@@ -285,10 +285,6 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         mem_tile_constraint_generator(
             solver,
             mem_name,
-            metadata,
-            lake_configs,
-            solver.max_cycles,
-            iterator_support=6,
             flush_offset=flush_offset,
         )
 
@@ -475,10 +471,6 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         pond_tile_constraint_generator(
             solver,
             pond_name,
-            metadata,
-            lake_configs,
-            solver.max_cycles,
-            iterator_support=6,
             flush_offset=flush_offset,
         )
 

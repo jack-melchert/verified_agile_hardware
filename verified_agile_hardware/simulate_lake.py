@@ -380,34 +380,16 @@ def simulate_mem_tile_counters(
     return addr_out, dim_out, read_addr_out, write_addr_out
 
 
-def simulate_pond_tile_counters(
-    app_dir,
-    pond_name,
-    config,
-    lake_configs,
-    cycles,
-    iterator_support,
-    max_cycles,
-    address_width=16,
-):
+def simulate_counters(app_dir, tile_name, tile_type, max_cycles, symbols_to_collect):
 
-    addr_out_symbols = [
-        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.in2regfile_0_sched_gen.addr_out",
-        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.regfile2out_0_sched_gen.addr_out",
-        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.in2regfile_0_addr_gen.addr_out",
-        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.regfile2out_0_addr_gen.addr_out",
-        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.in2regfile_0_for_loop.dim_counter",
-        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.regfile2out_0_for_loop.dim_counter",
-    ]
-
-    # First, create a verilog testbench for the pond tile
-    pond_tb = f"""
-module {pond_name}_simulation_tb();
+    # First, create a verilog testbench for the tile tile
+    tile_tb = f"""
+module {tile_name}_simulation_tb();
     reg clk;
     reg rst_n;
     reg flush;
 
-    {pond_name} {pond_name}_inst (
+    {tile_name} {tile_name}_inst (
         .clk(clk),
         .rst_n(rst_n),
         .flush(flush)
@@ -433,12 +415,12 @@ module {pond_name}_simulation_tb();
         for(k = 0; k<{max_cycles}; k=k+1)
         begin
     """
-    for addr in addr_out_symbols:
-        pond_tb += f"""
-        $display({pond_name}_inst.PondTop.{addr});
+    for addr in symbols_to_collect:
+        tile_tb += f"""
+        $display({tile_name}_inst.{tile_type}.{addr});
         """
 
-    pond_tb += f"""
+    tile_tb += f"""
             #10;
         end
 
@@ -453,34 +435,45 @@ endmodule
     """
 
     # write this to a file
-    with open(f"{app_dir}/{pond_name}_simulation_tb.v", "w") as f:
-        f.write(pond_tb)
+    with open(f"{app_dir}/{tile_name}_simulation_tb.v", "w") as f:
+        f.write(tile_tb)
 
     sources = [
-        f"{app_dir}/{pond_name}_simulation_tb.v",
-        f"{app_dir}/{pond_name}_simulation.v",
+        f"{app_dir}/{tile_name}_simulation_tb.v",
+        f"{app_dir}/{tile_name}_simulation.v",
         f"{app_dir}/garnet.v",
     ]
 
-    vpond_name = pond_name.replace("$", "_")
+    vtile_name = tile_name.replace("$", "_")
 
     # Run the simulation using icarus
     cmd = [
         "iverilog",
         "-o",
-        f"{app_dir}/{vpond_name}_simulation_tb",
+        f"{app_dir}/{vtile_name}_simulation_tb",
         *sources,
         "-s",
-        f"{pond_name}_simulation_tb",
+        f"{tile_name}_simulation_tb",
     ]
 
     print("Running command", cmd)
-    subprocess.run(cmd)
+    sim_res = subprocess.run(cmd, capture_output=True, text=True)
+    # check for errors
+    if sim_res.returncode != 0:
+        print("Error running iverilog")
+        print(sim_res.stderr)
+        breakpoint()
 
     # Run the simulation
-    cmd = [f"{app_dir}/{vpond_name}_simulation_tb"]
+    cmd = [f"{app_dir}/{vtile_name}_simulation_tb"]
     print("Running command", cmd)
     sim_res = subprocess.run(cmd, capture_output=True, text=True)
+
+    # check for errors
+    if sim_res.returncode != 0:
+        print("Error running testbench")
+        print(sim_res.stderr)
+        breakpoint()
 
     sim_res = sim_res.stdout.split("\n")
     sim_res = [s.strip() for s in sim_res if s != ""]
@@ -488,155 +481,11 @@ endmodule
     # Deinterleave sim_res
     addr_out = {}
 
-    for addr in addr_out_symbols:
+    for addr in symbols_to_collect:
         addr_out[addr] = []
 
     while sim_res:
-        for addr in addr_out_symbols:
+        for addr in symbols_to_collect:
             addr_out[addr].append(int(sim_res.pop(0)))
 
-    breakpoint()
     return addr_out
-
-    # So in order to get the valid starting address, dim count, read address, and write address, we need to run the
-    # SchedGenModel for a number of cycles and record the outputs at each cycle
-
-    # Unfortunately, lake doesn't have a real model of the memory tile behavior, so this will be fairly hardcoded
-    # sched_gens = {}
-
-    # sched_gens["in2regfile_0_sched_gen_sched_addr_gen"] = SchedGenModel(
-    #     "in2regfile_0_sched_gen",
-    #     iterator_support=4,
-    #     address_width=16,
-    # )
-
-    # sched_gens["regfile2out_0_sched_gen_sched_addr_gen"] = SchedGenModel(
-    #     "regfile2out_0_sched_gen",
-    #     iterator_support=4,
-    #     address_width=16,
-    # )
-
-    # addr_gens = {}
-
-    # # Now we have to do address generator simulation as well
-    # addr_gens["in2regfile_0_addr_gen"] = AddresssGeneratorModel(
-    #     "in2regfile_0_addr_gen",
-    #     iterator_support=4,
-    #     address_width=5,
-    # )
-
-    # addr_gens["regfile2out_0_addr_gen"] = AddresssGeneratorModel(
-    #     "regfile2out_0_addr_gen",
-    #     iterator_support=4,
-    #     address_width=5,
-    # )
-
-    # sched_gen_to_read_addr_gen = {}
-    # sched_gen_to_read_addr_gen["in2regfile_0_sched_gen_sched_addr_gen"] = (
-    #     addr_gens["in2regfile_0_addr_gen"]
-    # )
-    # sched_gen_to_read_addr_gen["regfile2out_0_sched_gen_sched_addr_gen"] = (
-    #     addr_gens["regfile2out_0_addr_gen"]
-    # )
-
-    # sched_gen_to_write_addr_gen = {}
-
-    # # Gotta handle these weird loop names
-    # loops_to_sched_gen = {}
-    # loops_to_sched_gen["in2regfile_0_sched_gen_sched_addr_gen"] = (
-    #     "in2regfile_0_for_loop"
-    # )
-    # loops_to_sched_gen["regfile2out_0_sched_gen_sched_addr_gen"] = (
-    #     "regfile2out_0_for_loop"
-    # )
-
-    # sched_and_addr_gen_dict = sched_gens.copy()
-    # sched_and_addr_gen_dict.update(addr_gens)
-
-    # for addr_gen_name, addr_gen in sched_and_addr_gen_dict.items():
-    #     new_config = {}
-
-    #     for config_name, lake_config in lake_configs:
-    #         if addr_gen_name in config_name:
-    #             new_config[config_name.split(addr_gen_name + "_")[1]] = lake_config
-
-    #         if (
-    #             addr_gen_name in loops_to_sched_gen
-    #             and loops_to_sched_gen[addr_gen_name] in config_name
-    #         ):
-    #             new_config[
-    #                 config_name.split(loops_to_sched_gen[addr_gen_name] + "_")[1]
-    #             ] = lake_config
-
-    #     addr_gen.set_config(new_config)
-
-    # addr_out = {}
-    # dim_out = {}
-    # read_addr_out = {}
-
-    # for controller_name in sched_gens:
-    #     addr_out[controller_name] = []
-    #     dim_out[controller_name] = []
-
-    #     if controller_name in sched_gen_to_read_addr_gen:
-    #         read_addr_out[controller_name] = []
-
-    # for cycle in range(cycles):
-    #     # Collect outputs
-    #     for controller_name, controller in sched_gens.items():
-    #         addr_out[controller_name].append(controller.get_address())
-    #         dim_out[controller_name].append(controller.dim_cnt.copy())
-
-    #         # read address gen
-    #         if controller_name in sched_gen_to_read_addr_gen:
-    #             read_controller = sched_gen_to_read_addr_gen[controller_name]
-    #             read_addr_out[controller_name].append(read_controller.get_address())
-
-    #     # Step all controllers
-    #     for controller_name, controller in sched_gens.items():
-
-    #         step_controller = cycle == controller.get_address()
-
-    #         if step_controller:
-
-    #             curr_dim = 0
-
-    #             if controller_name in loops_to_sched_gen:
-    #                 loop_name = loops_to_sched_gen[controller_name]
-
-    #                 dimensionality = loop_name + "_dimensionality"
-
-    #                 if dimensionality in lake_configs_dict:
-    #                     extents = []
-    #                     for dim in range(lake_configs_dict[dimensionality]):
-    #                         r = loop_name + "_ranges_" + str(dim)
-    #                         extent = lake_configs_dict[r]
-
-    #                         if controller.dim_cnt[dim] == extent:
-    #                             curr_dim = dim + 1
-    #                             break
-
-    #             if controller_name in sched_gen_to_read_addr_gen:
-    #                 read_controller = sched_gen_to_read_addr_gen[controller_name]
-    #                 read_controller.step(curr_dim)
-
-    #             controller.step()
-
-    # # # There is a pipeline register between the sram_tb_shared sched gen and the tb write addr gen
-    # # # Need to delay this controller write addr by one cycle
-    # # write_registered_step = [
-    # #     "sram_tb_shared_output_sched_gen_0_sched_addr_gen",
-    # #     "sram_tb_shared_output_sched_gen_1_sched_addr_gen",
-    # # ]
-    # # read_registered_step = [
-    # #     "agg_only_agg_write_sched_gen_0_sched_addr_gen",
-    # #     "agg_only_agg_write_sched_gen_1_sched_addr_gen",
-    # # ]
-
-    # # for controller_name in write_registered_step:
-    # #     write_addr_out[controller_name] = [0] + write_addr_out[controller_name][:-1]
-
-    # # for controller_name in read_registered_step:
-    # #     read_addr_out[controller_name] = [0] + read_addr_out[controller_name][:-1]
-
-    # return addr_out, dim_out, read_addr_out

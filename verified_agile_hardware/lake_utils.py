@@ -2,8 +2,7 @@ from verified_agile_hardware.solver import Solver, Rewriter
 from verified_agile_hardware.yosys_utils import mem_tile_to_btor, sv2v
 from verified_agile_hardware.configure_mem_tile import MemtileConfig
 from verified_agile_hardware.simulate_lake import (
-    simulate_mem_tile_counters,
-    simulate_pond_tile_counters,
+    simulate_counters,
 )
 from _kratos import create_wrapper_flatten
 from lake.models.addr_gen_model import AddrGenModel
@@ -343,122 +342,60 @@ def load_new_mem_tile(
 
 def mem_tile_constraint_generator(
     solver,
-    memtile_name,
-    config_dict,
-    lake_configs,
-    cycles,
-    iterator_support=2,
+    mem_name,
     flush_offset=0,
 ):
 
-    # if "port_controller" not in memtile_name:
-    #     return
+    symbols_to_collect = [
+        "mem_ctrl_stencil_valid_flat.stencil_valid_inst.stencil_valid_sched_gen.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_sched_gen_0.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_sched_gen_1.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.output_sched_gen_0.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.output_sched_gen_1.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_sched_gen_0.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_sched_gen_1.addr_out",
+        "mem_ctrl_stencil_valid_flat.stencil_valid_inst.loops_stencil_valid.dim_counter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.loops_in2buf_0.dim_counter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.loops_in2buf_1.dim_counter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_0.dim_counter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_1.dim_counter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.loops_buf2out_read_0.dim_counter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.loops_buf2out_read_1.dim_counter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_only.output_addr_gen_0.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_only.output_addr_gen_1.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_addr_gen_0.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_addr_gen_1.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_0.lin_addr_cnter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_1.lin_addr_cnter",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_addr_gen_0.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_addr_gen_1.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_write_addr_gen_0.addr_out",
+        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_write_addr_gen_1.addr_out",
+    ]
 
-    addr_out, dim_out, read_addr_out, write_addr_out = simulate_mem_tile_counters(
-        config_dict, lake_configs, cycles, iterator_support
+    addr_out = simulate_counters(
+        solver.app_dir,
+        mem_name,
+        "MemCore_inner",
+        solver.max_cycles,
+        symbols_to_collect,
     )
+
+    if not (mem_name == "m1"):
+        return
 
     for controller, addr_out_list in addr_out.items():
         addr_out[controller] = [0] * flush_offset + addr_out_list
 
-    for controller, addr_out_list in dim_out.items():
-        pad = [0] * len(addr_out_list[0])
-        dim_out[controller] = [pad] * flush_offset + addr_out_list
-
-    for controller, addr_out_list in read_addr_out.items():
-        read_addr_out[controller] = [0] * flush_offset + addr_out_list
-
-    for controller, addr_out_list in write_addr_out.items():
-        write_addr_out[controller] = [0] * flush_offset + addr_out_list
-
-    addr_out_to_symbol_name = {}
-    addr_out_to_symbol_name["stencil_valid_sched_gen_sched_addr_gen"] = (
-        "mem_ctrl_stencil_valid_flat.stencil_valid_inst.stencil_valid_sched_gen.addr_out"
-    )
-    addr_out_to_symbol_name["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.agg_only.agg_write_sched_gen_0.addr_out"
-    )
-    addr_out_to_symbol_name["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.agg_only.agg_write_sched_gen_1.addr_out"
-    )
-    addr_out_to_symbol_name["sram_tb_shared_output_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.sram_tb_shared.output_sched_gen_0.addr_out"
-    )
-    addr_out_to_symbol_name["sram_tb_shared_output_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.sram_tb_shared.output_sched_gen_1.addr_out"
-    )
-    addr_out_to_symbol_name["tb_only_tb_read_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.tb_only.tb_read_sched_gen_0.addr_out"
-    )
-    addr_out_to_symbol_name["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.tb_only.tb_read_sched_gen_1.addr_out"
-    )
-
-    dim_out_to_symbol_name = {}
-    dim_out_to_symbol_name["stencil_valid_sched_gen_sched_addr_gen"] = (
-        "mem_ctrl_stencil_valid_flat.stencil_valid_inst.loops_stencil_valid.dim_counter"
-    )
-    dim_out_to_symbol_name["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.agg_only.loops_in2buf_0.dim_counter"
-    )
-    dim_out_to_symbol_name["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.agg_only.loops_in2buf_1.dim_counter"
-    )
-    dim_out_to_symbol_name["sram_tb_shared_output_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_0.dim_counter"
-    )
-    dim_out_to_symbol_name["sram_tb_shared_output_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_1.dim_counter"
-    )
-    dim_out_to_symbol_name["tb_only_tb_read_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.tb_only.loops_buf2out_read_0.dim_counter"
-    )
-    dim_out_to_symbol_name["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.tb_only.loops_buf2out_read_1.dim_counter"
-    )
-
-    read_addr_out_to_symbol_name = {}
-    read_addr_out_to_symbol_name["sram_tb_shared_output_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.sram_only.output_addr_gen_0.addr_out"
-    )
-    read_addr_out_to_symbol_name["sram_tb_shared_output_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.sram_only.output_addr_gen_1.addr_out"
-    )
-    read_addr_out_to_symbol_name["tb_only_tb_read_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.tb_only.tb_read_addr_gen_0.addr_out"
-    )
-    read_addr_out_to_symbol_name["tb_only_tb_read_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.tb_only.tb_read_addr_gen_1.addr_out"
-    )
-    read_addr_out_to_symbol_name["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_0.lin_addr_cnter"
-    )
-    read_addr_out_to_symbol_name["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_1.lin_addr_cnter"
-    )
-
-    write_addr_out_to_symbol_name = {}
-    write_addr_out_to_symbol_name["agg_only_agg_write_sched_gen_0_sched_addr_gen"] = (
-        "strg_ub_vec_inst.agg_only.agg_write_addr_gen_0.addr_out"
-    )
-    write_addr_out_to_symbol_name["agg_only_agg_write_sched_gen_1_sched_addr_gen"] = (
-        "strg_ub_vec_inst.agg_only.agg_write_addr_gen_1.addr_out"
-    )
-    write_addr_out_to_symbol_name[
-        "sram_tb_shared_output_sched_gen_0_sched_addr_gen"
-    ] = "strg_ub_vec_inst.tb_only.tb_write_addr_gen_0.addr_out"
-    write_addr_out_to_symbol_name[
-        "sram_tb_shared_output_sched_gen_1_sched_addr_gen"
-    ] = "strg_ub_vec_inst.tb_only.tb_write_addr_gen_1.addr_out"
-
     for controller, addr_out_list in addr_out.items():
         for name, term in solver.fts.named_terms.items():
             if (
-                addr_out_to_symbol_name[controller] in name
-                and memtile_name in name
+                controller in name
+                and mem_name in name
                 and not solver.fts.is_next_var(term)
             ):
 
+                print("Adding mem addr out constraint", controller, name)
                 addr_out_type = term.get_sort()
 
                 addr_out_lut = []
@@ -470,118 +407,10 @@ def mem_tile_constraint_generator(
                         )
                     )
 
-                addr_out_var = solver.create_lut(
-                    f"{memtile_name}_{controller}_address_out",
-                    addr_out_lut,
-                    solver.create_bvsort(16),
-                    addr_out_type,
-                )
-
-                solver.fts.add_invar(
-                    solver.create_term(
-                        solver.ops.Equal, term, addr_out_var(solver.cycle_count)
-                    )
-                )
-                break
-
-    for controller, dim_out_list in dim_out.items():
-        for name, term in solver.fts.named_terms.items():
-            if (
-                dim_out_to_symbol_name[controller] in name
-                and memtile_name in name
-                and not solver.fts.is_next_var(term)
-            ):
-
-                dim_cnt_type = term.get_sort()
-
-                dim_out_lut = []
-
-                for i, dim_cnt in enumerate(dim_out_list):
-
-                    dm_sort = dim_cnt_type.get_width() // len(dim_cnt)
-
-                    dim_cnt_concat = 0
-
-                    # for dc_idx, dc in enumerate(reversed(dim_cnt)):
-                    for dc_idx, dc in enumerate(dim_cnt):
-                        dim_cnt_concat += dc << (dc_idx * dm_sort)
-
-                    dim_out_lut.append(
-                        (
-                            solver.create_const(i, solver.create_bvsort(16)),
-                            solver.create_const(dim_cnt_concat, dim_cnt_type),
-                        )
-                    )
-
-                starting_dim_cnt = solver.create_lut(
-                    f"{memtile_name}_{controller}_dimemsion_cnt",
-                    dim_out_lut,
-                    solver.create_bvsort(16),
-                    dim_cnt_type,
-                )
-
-                solver.fts.add_invar(
-                    solver.create_term(
-                        solver.ops.Equal, term, starting_dim_cnt(solver.cycle_count)
-                    )
-                )
-                break
-
-    for controller, addr_out_list in read_addr_out.items():
-        for name, term in solver.fts.named_terms.items():
-            if (
-                read_addr_out_to_symbol_name[controller] in name
-                and memtile_name in name
-                and not solver.fts.is_next_var(term)
-            ):
-
-                addr_out_type = term.get_sort()
-
-                addr_out_lut = []
-                for i, addr in enumerate(addr_out_list):
-                    addr_out_lut.append(
-                        (
-                            solver.create_const(i, solver.create_bvsort(16)),
-                            solver.create_const(addr, addr_out_type),
-                        )
-                    )
+                breakpoint()
 
                 addr_out_var = solver.create_lut(
-                    f"{memtile_name}_{controller}_read_address_out",
-                    addr_out_lut,
-                    solver.create_bvsort(16),
-                    addr_out_type,
-                )
-
-                solver.fts.add_invar(
-                    solver.create_term(
-                        solver.ops.Equal, term, addr_out_var(solver.cycle_count)
-                    )
-                )
-
-                break
-
-    for controller, addr_out_list in write_addr_out.items():
-        for name, term in solver.fts.named_terms.items():
-            if (
-                write_addr_out_to_symbol_name[controller] in name
-                and memtile_name in name
-                and not solver.fts.is_next_var(term)
-            ):
-
-                addr_out_type = term.get_sort()
-
-                addr_out_lut = []
-                for i, addr in enumerate(addr_out_list):
-                    addr_out_lut.append(
-                        (
-                            solver.create_const(i, solver.create_bvsort(16)),
-                            solver.create_const(addr, addr_out_type),
-                        )
-                    )
-
-                addr_out_var = solver.create_lut(
-                    f"{memtile_name}_{controller}_write_address_out",
+                    f"{mem_name}_{controller}_address_out",
                     addr_out_lut,
                     solver.create_bvsort(16),
                     addr_out_type,
@@ -631,21 +460,24 @@ def mem_tile_get_num_valids(config, cycles, iterator_support=2, address_width=16
 def pond_tile_constraint_generator(
     solver,
     pond_name,
-    config_dict,
-    lake_configs,
-    cycles,
-    iterator_support=2,
     flush_offset=0,
 ):
 
-    addr_out = simulate_pond_tile_counters(
+    symbols_to_collect = [
+        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.in2regfile_0_sched_gen.addr_out",
+        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.regfile2out_0_sched_gen.addr_out",
+        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.in2regfile_0_addr_gen.addr_out",
+        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.regfile2out_0_addr_gen.addr_out",
+        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.in2regfile_0_for_loop.dim_counter",
+        "mem_ctrl_strg_ub_thin_PondTop_flat.strg_ub_thin_PondTop_inst.regfile2out_0_for_loop.dim_counter",
+    ]
+
+    addr_out = simulate_counters(
         solver.app_dir,
         pond_name,
-        config_dict,
-        lake_configs,
-        cycles,
-        iterator_support,
+        "PondTop",
         solver.max_cycles,
+        symbols_to_collect,
     )
 
     for controller, addr_out_list in addr_out.items():
@@ -684,47 +516,3 @@ def pond_tile_constraint_generator(
                     )
                 )
                 break
-
-    # for controller, dim_out_list in dim_out.items():
-    #     for name, term in solver.fts.named_terms.items():
-    #         if (
-    #             dim_out_to_symbol_name[controller] in name
-    #             and pond_name in name
-    #             and not solver.fts.is_next_var(term)
-    #         ):
-
-    #             print("Adding pond dim count constraint", controller, name)
-    #             dim_cnt_type = term.get_sort()
-
-    #             dim_out_lut = []
-
-    #             for i, dim_cnt in enumerate(dim_out_list):
-
-    #                 dm_sort = dim_cnt_type.get_width() // len(dim_cnt)
-
-    #                 dim_cnt_concat = 0
-
-    #                 # for dc_idx, dc in enumerate(reversed(dim_cnt)):
-    #                 for dc_idx, dc in enumerate(dim_cnt):
-    #                     dim_cnt_concat += dc << (dc_idx * dm_sort)
-
-    #                 dim_out_lut.append(
-    #                     (
-    #                         solver.create_const(i, solver.create_bvsort(16)),
-    #                         solver.create_const(dim_cnt_concat, dim_cnt_type),
-    #                     )
-    #                 )
-
-    #             starting_dim_cnt = solver.create_lut(
-    #                 f"{pond_name}_{controller}_dimemsion_cnt",
-    #                 dim_out_lut,
-    #                 solver.create_bvsort(16),
-    #                 dim_cnt_type,
-    #             )
-
-    #             solver.fts.add_invar(
-    #                 solver.create_term(
-    #                     solver.ops.Equal, term, starting_dim_cnt(solver.cycle_count)
-    #                 )
-    #             )
-    #             break
