@@ -348,29 +348,29 @@ def mem_tile_constraint_generator(
 
     symbols_to_collect = [
         "mem_ctrl_stencil_valid_flat.stencil_valid_inst.stencil_valid_sched_gen.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_sched_gen_0.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_sched_gen_1.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.output_sched_gen_0.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.output_sched_gen_1.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_sched_gen_0.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_sched_gen_1.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_sched_gen_0.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_sched_gen_1.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.output_sched_gen_0.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.output_sched_gen_1.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_sched_gen_0.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_sched_gen_1.addr_out",
         "mem_ctrl_stencil_valid_flat.stencil_valid_inst.loops_stencil_valid.dim_counter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.loops_in2buf_0.dim_counter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.loops_in2buf_1.dim_counter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_0.dim_counter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_1.dim_counter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.loops_buf2out_read_0.dim_counter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.loops_buf2out_read_1.dim_counter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_only.output_addr_gen_0.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_only.output_addr_gen_1.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_addr_gen_0.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_addr_gen_1.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_0.lin_addr_cnter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_1.lin_addr_cnter",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_addr_gen_0.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_addr_gen_1.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_write_addr_gen_0.addr_out",
-        # "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_write_addr_gen_1.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.loops_in2buf_0.dim_counter",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.loops_in2buf_1.dim_counter",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_0.dim_counter",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_tb_shared.loops_buf2out_autovec_read_1.dim_counter",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.loops_buf2out_read_0.dim_counter",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.loops_buf2out_read_1.dim_counter",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_only.output_addr_gen_0.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.sram_only.output_addr_gen_1.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_addr_gen_0.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_read_addr_gen_1.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_0.lin_addr_cnter",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_sram_shared.agg_sram_shared_addr_gen_1.lin_addr_cnter",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_addr_gen_0.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.agg_only.agg_write_addr_gen_1.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_write_addr_gen_0.addr_out",
+        "mem_ctrl_strg_ub_vec_flat.strg_ub_vec_inst.tb_only.tb_write_addr_gen_1.addr_out",
     ]
 
     addr_out = simulate_counters(
@@ -380,9 +380,6 @@ def mem_tile_constraint_generator(
         solver.max_cycles,
         symbols_to_collect,
     )
-
-    if not (mem_name == "m1"):
-        return
 
     for controller, addr_out_list in addr_out.items():
         addr_out[controller] = [0] * flush_offset + addr_out_list
@@ -406,8 +403,6 @@ def mem_tile_constraint_generator(
                             solver.create_const(addr, addr_out_type),
                         )
                     )
-
-                breakpoint()
 
                 addr_out_var = solver.create_lut(
                     f"{mem_name}_{controller}_address_out",
