@@ -16,8 +16,7 @@ def get_garnet_inputs(solver):
     input_vars = []
     for i in solver.fts.inputvars:
         solver.fts.promote_inputvar(i)
-        if "glb2io" in str(i):
-            input_vars.append(i)
+        input_vars.append(i)
 
     input_vars = sorted(input_vars, key=lambda x: str(x))
 
