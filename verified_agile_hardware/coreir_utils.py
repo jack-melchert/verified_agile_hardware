@@ -653,6 +653,11 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
             and "inst" in data
             and data["inst"].module.name == "Mem"
         ):
+            if "Counter" in str(node) or (
+                str(node) in solver.id_to_name
+                and "Counter" in solver.id_to_name[str(node)]
+            ):
+                continue
             curr_node = node
             while len(graph.out_edges(curr_node)) != 0:
                 assert (
@@ -664,6 +669,9 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
 
             stencil_valid_name = f"{edge[1]}.{graph.edges[edge]['sink_port']}"
             solver.stencil_valid_to_port_controller[stencil_valid_name] = node
+
+    if len(list(nx.simple_cycles(graph))) > 0:
+        breakpoint()
 
     node_symbols = {}
     input_symbols = {}
@@ -690,9 +698,16 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
                 edge_info = graph.edges[in_]
                 source = in_[0]
                 name = f'{in_[1]}.{edge_info["sink_port"]}'
-                output_symbols[name] = node_symbols[source][
-                    f'{source}.{edge_info["source_port"]}'
-                ]
+                output_symbols[name] = solver.create_fts_state_var(
+                    name, solver.create_bvsort(edge_info["bitwidth"])
+                )
+                solver.fts.add_invar(
+                    solver.create_term(
+                        solver.ops.Equal,
+                        node_symbols[source][f'{source}.{edge_info["source_port"]}'],
+                        output_symbols[name],
+                    )
+                )
         else:
             if "inst" not in data:
                 if str(node) == "in" or str(node) == "out":

@@ -43,7 +43,7 @@ def get_mem_inputs(solver, mem_name):
 def get_mem_sram_var(solver, mem_name, sram_name="data_array"):
     sram_vars = []
     for sv in solver.fts.statevars:
-        if sram_name in str(sv) and mem_name in str(sv):
+        if sram_name in str(sv) and (mem_name + ".") in str(sv):
             sram_vars.append(sv)
 
     assert len(sram_vars) == 1, f"Wrong number of SRAMs found: {len(sram_vars)}"
