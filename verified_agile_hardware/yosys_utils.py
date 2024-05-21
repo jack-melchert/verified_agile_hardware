@@ -1,5 +1,6 @@
 import subprocess
 import os
+from gemstone.common.configurable import ConfigRegister
 
 
 def run_yosys_script(script, yosys_path="yosys"):
@@ -27,6 +28,8 @@ def run_yosys_script(script, yosys_path="yosys"):
         raise RuntimeError(stdout.decode("utf-8"))
     if "ERROR" in stderr.decode("utf-8"):
         raise RuntimeError(stderr.decode("utf-8"))
+
+    print(stdout.decode("utf-8"))
 
     print("Finished running Yosys script.")
 
@@ -121,18 +124,66 @@ clean -purge;
 setundef -undriven -expose; 
 opt -full;
 
-write_btor {btor_filename}            
 write_verilog {btor_filename}.v
+write_btor {btor_filename}            
     """
     run_yosys_script(script)
     print(f"Finished writing BTOR2 file to {btor_filename}")
 
 
-def garnet_tile_to_btor(
+def garnet_to_btor(
+    app_dir="/aha/",
+    garnet_filename="/aha/garnet/garnet",
+    garnet_tile_module="Interconnect",
+    btor_filename="garnet.btor2",
+):
+    """Convert a memory tile to a BTOR2 file."""
+    # Check if garnet_filename exists
+    try:
+        with open(garnet_filename, "r") as f:
+            pass
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Could not find {garnet_filename}")
+
+    # sv2v_garnet_filename = (
+    #     app_dir + "/" + os.path.basename(garnet_filename).replace(".sv", ".v")
+    # )
+
+    # # try:
+    # #     with open(sv2v_garnet_filename, "r") as f:
+    # #         pass
+    # # except FileNotFoundError:
+    # sv2v(garnet_filename, sv2v_garnet_filename)
+
+    script = f"""
+read -formal {garnet_filename} 
+prep -top {garnet_tile_module};
+
+hierarchy -check;
+
+chformal -assume -early;
+
+memory -nomap; 
+
+clk2fflogic;
+
+opt -full;
+clean -purge;
+
+write_verilog {btor_filename}.v
+write_btor {btor_filename}            
+"""
+
+    print(script)
+    run_yosys_script(script)
+    print(f"Finished writing BTOR2 file to {btor_filename}")
+
+
+def flatten_garnet(
     app_dir="/aha/",
     garnet_filename="/aha/garnet/garnet.v",
     garnet_tile_module="Interconnect",
-    btor_filename="garnet.btor2",
+    garnet_flattened="/aha/garnet/garnet_flattened",
 ):
     """Convert a memory tile to a BTOR2 file."""
     # Check if garnet_filename exists
@@ -154,31 +205,13 @@ def garnet_tile_to_btor(
 
     script = f"""
 read -formal {sv2v_garnet_filename} /aha/garnet/peak_core/CW_fp_add.v /aha/garnet/peak_core/CW_fp_mult.v
-
-prep -top {garnet_tile_module};
-
-hierarchy -check;
-
-chformal -assume -early;
-
-memory -nomap; 
-#opt -full;
-clean -purge;
-
-flatten; 
-#opt -full;
-clean -purge;
-
-clk2fflogic;
+hierarchy -top {garnet_tile_module}
+proc
+flatten;
+setundef -undriven -expose
 opt -full;
-
 clean -purge;
-
-setundef -undriven -expose; 
-opt -full;
-
-write_btor {btor_filename}            
-write_verilog {btor_filename}.v
+write_verilog {garnet_flattened}
     """
     run_yosys_script(script)
-    print(f"Finished writing BTOR2 file to {btor_filename}")
+    print(f"Finished writing flattened verilog file to {garnet_flattened}")

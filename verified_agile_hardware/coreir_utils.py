@@ -62,21 +62,23 @@ def port_remap_mem(mode, port, port_remap):
     return port
 
 
-def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
+def node_to_smt(
+    solver, tile_type, in_symbols, out_symbols_names, out_symbol_widths, data, node
+):
+    out_symbols = {}
+
     if tile_type == "global.IO" or tile_type == "global.BitIO":
         assert len(in_symbols) == 1
 
-        for in_symbol in in_symbols:
-            for out_symbol in out_symbols:
-                solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
-                )
+        for in_symbol_name, in_symbol in in_symbols.items():
+            for out_symbol_name in out_symbols_names:
+                out_symbols[out_symbol_name] = in_symbol
 
     elif tile_type == "global.PE":
         # To use bitwuzla, we can try packing the PE instuction into this node, and calling the PE smt with the constant
 
         out_port_names = [
-            str(out_symbol).split(f"{node}.")[1] for out_symbol in out_symbols
+            str(out_symbol).split(f"{node}.")[1] for out_symbol in out_symbols_names
         ]
         pe_name = str(node)
         pe0, bboxes0, pe_inputs = load_pe_tile(
@@ -95,8 +97,8 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         ]
         port_remap_reversed = {v: k for k, v in port_remap.items()}
 
-        for in_symbol in in_symbols:
-            port = str(in_symbol).split(f"{node}.")[1]
+        for in_symbol_name, in_symbol in in_symbols.items():
+            port = in_symbol_name.split(f"{node}.")[1]
             width = in_symbol.get_sort().get_width()
             if f"{port}_{pe_name}" not in pe_inputs:
                 port = port_remap_reversed[port]
@@ -147,8 +149,8 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         ]
         port_remap_reversed = {v: k for k, v in port_remap.items()}
 
-        for out_symbol in out_symbols:
-            port = str(out_symbol).split(f"{node}.")[1]
+        for out_symbol_name in out_symbols_names:
+            port = out_symbol_name.split(f"{node}.")[1]
 
             if port in out_to_slice:
                 start, end = out_to_slice[port]
@@ -160,20 +162,23 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
             ext = ss.Op(ss.primops.Extract, end, start)
             ext_pe = solver.create_term(ext, pe0)
 
-            out_symbol_width = out_symbol.get_sort().get_width()
+            out_symbol_width = out_symbol_widths[out_symbol_name]
             if out_symbol_width == ext_pe.get_sort().get_width():
-                solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, out_symbol, ext_pe)
-                )
+                out_symbols[out_symbol_name] = ext_pe
             else:
-                out_symbol_short = solver.fts.make_term(
-                    ss.Op(ss.primops.Extract, ext_pe.get_sort().get_width() - 1, 0),
-                    out_symbol,
+                # Pad the output to out_symbol_width
+                ext_pe_extended = solver.create_term(
+                    ss.Op(ss.primops.Concat),
+                    ext_pe,
+                    solver.create_const(
+                        0,
+                        solver.create_bvsort(
+                            out_symbol_width - ext_pe.get_sort().get_width()
+                        ),
+                    ),
                 )
 
-                solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, out_symbol_short, ext_pe)
-                )
+                out_symbols[out_symbol_name] = ext_pe_extended
 
     elif tile_type == "cgralib.Mem":
         mem_name = data["inst"].name
@@ -257,12 +262,12 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         config_dict["rst_n"] = 1
 
         used_inputs = [
-            port_remap_mem(mode, str(in_symbol).split(f"{mem_name}.")[1], port_remap)
-            for in_symbol in in_symbols
+            port_remap_mem(mode, in_symbol_name.split(f"{mem_name}.")[1], port_remap)
+            for in_symbol_name, in_symbol in in_symbols.items()
         ]
         used_outputs = [
-            port_remap_mem(mode, str(out_symbol).split(f"{mem_name}.")[1], port_remap)
-            for out_symbol in out_symbols
+            port_remap_mem(mode, out_symbol.split(f"{mem_name}.")[1], port_remap)
+            for out_symbol in out_symbols_names
         ]
 
         if mode == "ROM":
@@ -285,27 +290,20 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         mem_tile_constraint_generator(
             solver,
             mem_name,
-            metadata,
-            lake_configs,
-            solver.max_cycles,
-            iterator_support=6,
             flush_offset=flush_offset,
         )
 
         used_mem_inputs = []
 
-        # Reset, clock, and flush
-        # solver.rsts.append(mem_inputs[f"rst_n_{mem_name}"])
-        # used_mem_inputs.append(mem_inputs[f"rst_n_{mem_name}"])
+        # clock, and flush
         solver.clks.append(mem_inputs[f"clk_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"clk_{mem_name}"])
         solver.flushes.append(mem_inputs[f"flush_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"flush_{mem_name}"])
 
-        for in_symbol in in_symbols:
-            port = str(in_symbol).split(f"{mem_name}.")[1]
+        for in_symbol_name, in_symbol in in_symbols.items():
+            port = in_symbol_name.split(f"{mem_name}.")[1]
 
-            # Need to fix this for verify-pnr
             port = port_remap_mem(mode, port, port_remap)
 
             in_symbol_width = in_symbol.get_sort().get_width()
@@ -358,12 +356,12 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                     )
                 )
 
-        for out_symbol in out_symbols:
-            port = str(out_symbol).split(f"{mem_name}.")[1]
+        for out_symbol_name in out_symbols_names:
+            port = out_symbol_name.split(f"{mem_name}.")[1]
 
             port = port_remap_mem(mode, port, port_remap)
 
-            out_symbol_width = out_symbol.get_sort().get_width()
+            out_symbol_width = out_symbol_widths[out_symbol_name]
             if (
                 out_symbol_width
                 == mem_outputs[f"{port}_{mem_name}"].get_sort().get_width()
@@ -374,14 +372,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                     ss.Op(ss.primops.Extract, out_symbol_width - 1, 0),
                     mem_outputs[f"{port}_{mem_name}"],
                 )
-
-            solver.fts.add_invar(
-                solver.create_term(
-                    solver.ops.Equal,
-                    out_symbol,
-                    mem_output,
-                )
-            )
+            out_symbols[out_symbol_name] = mem_output
 
         if mode == "ROM":
             assert "init" in metadata
@@ -447,12 +438,12 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         config_dict["rst_n"] = 1
 
         used_inputs = [
-            port_remap_mem(mode, str(in_symbol).split(f"{pond_name}.")[1], port_remap)
-            for in_symbol in in_symbols
+            port_remap_mem(mode, in_symbol_name.split(f"{pond_name}.")[1], port_remap)
+            for in_symbol_name in in_symbols
         ]
         used_outputs = [
-            port_remap_mem(mode, str(out_symbol).split(f"{pond_name}.")[1], port_remap)
-            for out_symbol in out_symbols
+            port_remap_mem(mode, out_symbol.split(f"{pond_name}.")[1], port_remap)
+            for out_symbol in out_symbols_names
         ]
 
         if mode == "ROM":
@@ -475,25 +466,19 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
         pond_tile_constraint_generator(
             solver,
             pond_name,
-            metadata,
-            lake_configs,
-            solver.max_cycles,
-            iterator_support=6,
             flush_offset=flush_offset,
         )
 
         used_pond_inputs = []
 
-        # Reset, clock, and flush
-        # solver.rsts.append(pond_inputs[f"rst_n_{pond_name}"])
-        # used_pond_inputs.append(pond_inputs[f"rst_n_{pond_name}"])
+        # clock, and flush
         solver.clks.append(pond_inputs[f"clk_{pond_name}"])
         used_pond_inputs.append(pond_inputs[f"clk_{pond_name}"])
         solver.flushes.append(pond_inputs[f"flush_{pond_name}"])
         used_pond_inputs.append(pond_inputs[f"flush_{pond_name}"])
 
-        for in_symbol in in_symbols:
-            port = str(in_symbol).split(f"{pond_name}.")[1]
+        for in_symbol_name, in_symbol in in_symbols.items():
+            port = in_symbol_name.split(f"{pond_name}.")[1]
 
             port = port_remap_mem(mode, port, port_remap)
 
@@ -547,12 +532,12 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                     )
                 )
 
-        for out_symbol in out_symbols:
-            port = str(out_symbol).split(f"{pond_name}.")[1]
+        for out_symbol_name in out_symbols_names:
+            port = out_symbol_name.split(f"{pond_name}.")[1]
 
             port = port_remap_mem(mode, port, port_remap)
 
-            out_symbol_width = out_symbol.get_sort().get_width()
+            out_symbol_width = out_symbol_widths[out_symbol_name]
             if (
                 out_symbol_width
                 == pond_outputs[f"{port}_{pond_name}"].get_sort().get_width()
@@ -564,13 +549,7 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                     pond_outputs[f"{port}_{pond_name}"],
                 )
 
-            solver.fts.add_invar(
-                solver.create_term(
-                    solver.ops.Equal,
-                    out_symbol,
-                    pond_output,
-                )
-            )
+            out_symbols[out_symbol_name] = pond_output
 
         if mode == "ROM":
             assert "init" in metadata
@@ -578,18 +557,18 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
 
     elif tile_type == "coreir.reg" or tile_type == "corebit.reg":
         name = str(node)
-        reg_in = solver.create_fts_state_var(f"{name}.reg_in", in_symbols[0].get_sort())
-        reg_val = solver.create_fts_state_var(
-            f"{name}.reg_val", in_symbols[0].get_sort()
+        reg_in = solver.create_fts_state_var(
+            f"{name}.reg_in", list(in_symbols.values())[0].get_sort()
         )
-        for in_symbol in in_symbols:
+        reg_val = solver.create_fts_state_var(
+            f"{name}.reg_val", list(in_symbols.values())[0].get_sort()
+        )
+        for in_symbol_name, in_symbol in in_symbols.items():
             solver.fts.assign_next(reg_in, in_symbol)
             solver.fts.assign_next(reg_val, reg_in)
 
-        for out_symbol in out_symbols:
-            solver.fts.add_invar(
-                solver.create_term(solver.ops.Equal, out_symbol, reg_val)
-            )
+        for out_symbol_name in out_symbols_names:
+            out_symbols[out_symbol_name] = reg_val
     elif (
         tile_type == "corebit.const"
         or tile_type == "coreir.const"
@@ -604,18 +583,20 @@ def node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node):
                 value = int(value)
             else:
                 value = value.value
-        const = solver.create_const(value, out_symbols[0].get_sort())
-        solver.fts.add_invar(
-            solver.create_term(solver.ops.Equal, out_symbols[0], const)
-        )
+        width = out_symbol_widths[out_symbols_names[0]]
+        const = solver.create_const(value, solver.create_bvsort(width))
+
+        for out_symbol_name in out_symbols_names:
+            out_symbols[out_symbol_name] = const
     elif tile_type == "route":  # it's a pnr route node
-        for in_symbol in in_symbols:
-            for out_symbol in out_symbols:
-                solver.fts.add_invar(
-                    solver.create_term(solver.ops.Equal, in_symbol, out_symbol)
-                )
+
+        for in_symbol_name, in_symbol in in_symbols.items():
+            for out_symbol_name in out_symbols_names:
+                out_symbols[out_symbol_name] = in_symbol
     else:
         raise NotImplementedError(f"Tile type {tile_type} not implemented")
+
+    return out_symbols
 
 
 def pack_pe_constants(graph):
@@ -685,50 +666,70 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
             solver.stencil_valid_to_port_controller[stencil_valid_name] = node
 
     node_symbols = {}
-    node_symbols["in"] = {}
-    node_symbols["out"] = {}
+    input_symbols = {}
+    output_symbols = {}
 
-    for node, data in graph.nodes(data=True):
-        symbols = {}
-
-        in_symbols = []
-        for in_ in graph.in_edges(node):
-            edge_info = graph.edges[in_]
-            name = f"{in_[1]}.{graph.edges[in_]['sink_port']}"
-            if name not in symbols:
-                symbols[name] = solver.create_fts_state_var(
+    # Topological sort
+    for node in nx.topological_sort(graph):
+        # for node, data in graph.nodes(data=True):
+        data = graph.nodes[node]
+        if node == "in":
+            in_symbols = {}
+            for out_ in graph.out_edges(node):
+                edge_info = graph.edges[out_]
+                name = f"{out_[1]}.{graph.edges[out_]['sink_port']}"
+                input_symbols[name] = solver.create_fts_state_var(
                     name, solver.create_bvsort(edge_info["bitwidth"])
                 )
-            in_symbols.append(symbols[name])
-
-        out_symbols = []
-        for out_ in graph.out_edges(node):
-            edge_info = graph.edges[out_]
-            name = f"{out_[0]}.{graph.edges[out_]['source_port']}"
-            if name not in symbols:
-                symbols[name] = solver.create_fts_state_var(
-                    name, solver.create_bvsort(edge_info["bitwidth"])
-                )
-            out_symbols.append(symbols[name])
-        node_symbols[node] = symbols
-
-        if "inst" not in data:
-            if str(node) == "in" or str(node) == "out":
-                data["node_type"] = "route"
-            tile_type = data["node_type"]
+                in_symbols[f'{out_[0]}.{edge_info["source_port"]}'] = input_symbols[
+                    name
+                ]
+            node_symbols[node] = in_symbols
+        elif node == "out":
+            for in_ in graph.in_edges(node):
+                edge_info = graph.edges[in_]
+                source = in_[0]
+                name = f'{in_[1]}.{edge_info["sink_port"]}'
+                output_symbols[name] = node_symbols[source][
+                    f'{source}.{edge_info["source_port"]}'
+                ]
         else:
-            tile_type = data["inst"].module.ref_name
+            if "inst" not in data:
+                if str(node) == "in" or str(node) == "out":
+                    data["node_type"] = "route"
+                tile_type = data["node_type"]
+            else:
+                tile_type = data["inst"].module.ref_name
 
-        node_to_smt(solver, tile_type, in_symbols, out_symbols, data, node)
+            in_symbols = {}
+            for in_ in graph.in_edges(node):
+                edge_info = graph.edges[in_]
+                source = in_[0]
+                in_name = f'{in_[1]}.{edge_info["sink_port"]}'
+                out_name = f'{source}.{edge_info["source_port"]}'
+                source_symbol = node_symbols[source][out_name]
+                in_symbols[in_name] = source_symbol
 
-    for source, sink, data in graph.edges(data=True):
-        source_symbol = node_symbols[source][f'{source}.{data["source_port"]}']
-        sink_symbol = node_symbols[sink][f'{sink}.{data["sink_port"]}']
-        solver.fts.add_invar(
-            solver.create_term(solver.ops.Equal, source_symbol, sink_symbol)
-        )
+            out_symbol_widths = {}
+            out_symbols_names = []
+            for out_ in graph.out_edges(node):
+                edge_info = graph.edges[out_]
+                source = out_[0]
+                name = f'{node}.{edge_info["source_port"]}'
+                out_symbols_names.append(name)
+                out_symbol_widths[name] = edge_info["bitwidth"]
 
-    return solver, node_symbols["in"], node_symbols["out"]
+            node_symbols[node] = node_to_smt(
+                solver,
+                tile_type,
+                in_symbols,
+                out_symbols_names,
+                out_symbol_widths,
+                data,
+                node,
+            )
+
+    return solver, input_symbols, output_symbols
 
 
 def coreir_to_nx(cmod):
