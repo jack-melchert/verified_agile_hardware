@@ -142,19 +142,8 @@ def remove_config_regs(garnet_filename, configed_garnet_filename):
     f = open(configed_garnet_filename, "w")
 
     found_config = False
-    found_interconnect_def = False
-    interconnect_def = ""
 
     for line in garnet_lines:
-
-        if "module Interconnect" in line:
-            found_interconnect_def = True
-
-        if found_interconnect_def:
-            interconnect_def += line
-
-        if found_interconnect_def and ");" in line:
-            found_interconnect_def = False
 
         if "ConfigRegister" in line and "config_reg_" in line:
             found_config = True
@@ -166,5 +155,3 @@ def remove_config_regs(garnet_filename, configed_garnet_filename):
             found_config = False
 
     f.close()
-
-    return interconnect_def

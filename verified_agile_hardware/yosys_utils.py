@@ -197,11 +197,29 @@ def flatten_garnet(
         app_dir + "/" + os.path.basename(garnet_filename).replace(".sv", ".v")
     )
 
-    try:
-        with open(sv2v_garnet_filename, "r") as f:
-            pass
-    except FileNotFoundError:
-        sv2v(garnet_filename, sv2v_garnet_filename)
+    # try:
+    #     with open(sv2v_garnet_filename, "r") as f:
+    #         pass
+    # except FileNotFoundError:
+    sv2v(garnet_filename, sv2v_garnet_filename)
+
+    with open(sv2v_garnet_filename, "r") as f:
+        garnet_lines = f.readlines()
+
+    found_interconnect_def = False
+    interconnect_def = ""
+
+    for line in garnet_lines:
+        if "module Interconnect" in line:
+            found_interconnect_def = True
+
+        if found_interconnect_def:
+            interconnect_def += line
+
+        if found_interconnect_def and ");" in line:
+            found_interconnect_def = False
+
+    f.close()
 
     script = f"""
 read -formal {sv2v_garnet_filename} /aha/garnet/peak_core/CW_fp_add.v /aha/garnet/peak_core/CW_fp_mult.v
@@ -215,3 +233,5 @@ write_verilog {garnet_flattened}
     """
     run_yosys_script(script)
     print(f"Finished writing flattened verilog file to {garnet_flattened}")
+
+    return interconnect_def
