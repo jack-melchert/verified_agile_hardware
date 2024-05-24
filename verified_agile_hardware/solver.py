@@ -5,7 +5,7 @@ import os
 
 
 class Solver:
-    def __init__(self, solver_name="btor"):
+    def __init__(self, solver_name="bitwuzla"):
         self.fe_solver = fe.Solver(solver_name)
         self.solver = self.fe_solver.solver
         self.solver.set_opt("incremental", "true")
@@ -74,7 +74,7 @@ class Solver:
     def assert_formula(self, formula):
         self.solver.assert_formula(formula)
 
-    def create_lut(self, name, lut_vals, idx_sort, elem_sort):
+    def create_lut(self, name, lut_vals, idx_sort, elem_sort, min_idx, max_idx):
 
         # array = self.create_fts_state_var(
         #     name,
@@ -107,7 +107,7 @@ class Solver:
         def lut_return_val(select_val):
             ret_val = lut_vals[0][1]
 
-            for idx, val in lut_vals:
+            for idx, val in lut_vals[min_idx:max_idx]:
                 ret_val = self.create_term(
                     self.ops.Ite,
                     self.create_term(self.ops.Equal, idx, select_val),

@@ -29,7 +29,7 @@ def run_yosys_script(script, yosys_path="yosys"):
     if "ERROR" in stderr.decode("utf-8"):
         raise RuntimeError(stderr.decode("utf-8"))
 
-    print(stdout.decode("utf-8"))
+    # print(stdout.decode("utf-8"))
 
     print("Finished running Yosys script.")
 
@@ -80,9 +80,7 @@ def mem_tile_to_btor(
     except FileNotFoundError:
         raise FileNotFoundError(f"Could not find {memtile_filename}")
 
-    sv2v_garnet_filename = (
-        app_dir + "/" + os.path.basename(garnet_filename).replace(".sv", ".v")
-    )
+    sv2v_garnet_filename = garnet_filename.replace(".sv", ".v")
     sv2v_memtile_filename = (
         app_dir + "/" + os.path.basename(memtile_filename).replace(".sv", ".v")
     )

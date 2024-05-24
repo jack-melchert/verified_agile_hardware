@@ -14,6 +14,7 @@ import pysmt
 import pysmt.shortcuts as smt
 from pysmt.typing import BVType, BOOL
 from lassen import PE_fc, Inst_fc
+import os
 
 
 def get_aadt(T):

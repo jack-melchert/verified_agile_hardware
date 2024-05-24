@@ -409,6 +409,8 @@ def mem_tile_constraint_generator(
                     addr_out_lut,
                     solver.create_bvsort(16),
                     addr_out_type,
+                    solver.starting_cycle,
+                    solver.max_cycles,
                 )
 
                 solver.fts.add_invar(
@@ -503,6 +505,8 @@ def pond_tile_constraint_generator(
                     addr_out_lut,
                     solver.create_bvsort(16),
                     addr_out_type,
+                    solver.starting_cycle,
+                    solver.max_cycles,
                 )
 
                 solver.fts.add_invar(

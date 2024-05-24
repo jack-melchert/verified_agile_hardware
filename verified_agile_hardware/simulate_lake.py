@@ -441,7 +441,7 @@ endmodule
     sources = [
         f"{app_dir}/{tile_name}_simulation_tb.v",
         f"{app_dir}/{tile_name}_simulation.v",
-        f"{app_dir}/garnet.v",
+        f"/aha/garnet/garnet.v",
     ]
 
     vtile_name = tile_name.replace("$", "_")
