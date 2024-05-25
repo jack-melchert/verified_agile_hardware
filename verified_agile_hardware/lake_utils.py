@@ -110,10 +110,10 @@ def produce_configed_memtile_verilog(
             outputs_and_bw.append((name, bw, packed, size))
 
     # Setting all unused inputs to 0 for some reason causes the memtiles to misbehave
-    # for in_, bw, packed, size in inputs_and_bw:
-    #     if in_ in config_dict or in_ in used_inputs:
-    #         continue
-    #     config_dict[in_] = 0
+    for in_, bw, packed, size in inputs_and_bw:
+        if in_ in config_dict or in_ in used_inputs:
+            continue
+        config_dict[in_] = 0
 
     # Module definition
     verilog = f"""module {mem_name} (\n"""
@@ -392,7 +392,7 @@ def mem_tile_constraint_generator(
                 and not solver.fts.is_next_var(term)
             ):
 
-                print("Adding mem addr out constraint", controller, name)
+                # print("Adding mem addr out constraint", controller, name)
                 addr_out_type = term.get_sort()
 
                 addr_out_lut = []
@@ -488,7 +488,7 @@ def pond_tile_constraint_generator(
                 and not solver.fts.is_next_var(term)
             ):
 
-                print("Adding pond addr out constraint", controller, name)
+                # print("Adding pond addr out constraint", controller, name)
                 addr_out_type = term.get_sort()
 
                 addr_out_lut = []

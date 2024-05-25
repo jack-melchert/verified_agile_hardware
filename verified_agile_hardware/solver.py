@@ -5,7 +5,7 @@ import os
 
 
 class Solver:
-    def __init__(self, solver_name="bitwuzla"):
+    def __init__(self, solver_name="btor"):
         self.fe_solver = fe.Solver(solver_name)
         self.solver = self.fe_solver.solver
         self.solver.set_opt("incremental", "true")
