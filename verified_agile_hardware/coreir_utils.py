@@ -667,7 +667,7 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
                 for edge in graph.out_edges(curr_node):
                     curr_node = edge[1]
 
-            stencil_valid_name = f"{edge[1]}.{graph.edges[edge]['sink_port']}"
+            stencil_valid_name = f"{edge[1]}.{edge[0]}"
             solver.stencil_valid_to_port_controller[stencil_valid_name] = node
 
     if len(list(nx.simple_cycles(graph))) > 0:
@@ -697,7 +697,7 @@ def nx_to_smt(graph, interconnect, solver, app_dir=None):
             for in_ in graph.in_edges(node):
                 edge_info = graph.edges[in_]
                 source = in_[0]
-                name = f'{in_[1]}.{edge_info["sink_port"]}'
+                name = f"{in_[1]}.{source}"
                 output_symbols[name] = solver.create_fts_state_var(
                     name, solver.create_bvsort(edge_info["bitwidth"])
                 )

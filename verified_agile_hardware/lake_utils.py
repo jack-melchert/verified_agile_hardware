@@ -68,6 +68,12 @@ def config_rom(solver, mem_name, rom_val):
             )
 
     for i, val in enumerate(packed_rom_val):
+        # sram_var = solver.create_term(
+        #     solver.ops.Store,
+        #     sram_var,
+        #     solver.create_term(i, index_sort),
+        #     solver.create_term(val, element_sort),
+        # )
         solver.fts.add_invar(
             solver.create_term(
                 solver.ops.Equal,
@@ -77,6 +83,12 @@ def config_rom(solver, mem_name, rom_val):
                 solver.create_const(val, element_sort),
             )
         )
+
+    # solver.fts.add_invar(
+    #     solver.create_term(
+    #         solver.ops.Equal, sram_var, get_mem_sram_var(solver, mem_name)
+    #     )
+    # )
 
     for name, term in solver.fts.named_terms.items():
         if "r_w_seq_current_state" in name and mem_name in name:
