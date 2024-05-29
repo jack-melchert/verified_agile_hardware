@@ -631,11 +631,9 @@ def pack_pe_constants(graph):
                         break
 
 
-def nx_to_smt(graph, interconnect, solver, app_dir=None):
+def nx_to_smt(graph, interconnect, solver):
     pack_pe_constants(graph)
 
-    if not os.path.exists(solver.app_dir):
-        os.mkdir(solver.app_dir)
 
     solver.interconnect = interconnect
 
