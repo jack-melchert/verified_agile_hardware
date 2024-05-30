@@ -396,15 +396,32 @@ def mem_tile_constraint_generator(
     for controller, addr_out_list in addr_out.items():
         addr_out[controller] = [0] * flush_offset + addr_out_list
 
+    garnet_mem_name = mem_name
+    if hasattr(solver, "placement") and mem_name in solver.placement:
+        loc = solver.placement[mem_name]
+        x = loc[0]
+        y = loc[1]
+        x_hex = hex(x)[2:]
+        y_hex = hex(y)[2:]
+
+        if len(x_hex) == 1:
+            x_hex = "0" + x_hex
+
+        if len(y_hex) == 1:
+            y_hex = "0" + y_hex
+
+        garnet_mem_name = f"Tile_X{x_hex}_Y{y_hex}.MemCore_inst0.MemCore_inner_W_inst0.MemCore_inner"
+
+
     for controller, addr_out_list in addr_out.items():
         for name, term in solver.fts.named_terms.items():
             if (
                 controller in name
-                and mem_name in name
+                and (mem_name in name or garnet_mem_name in name)
                 and not solver.fts.is_next_var(term)
             ):
 
-                # print("Adding mem addr out constraint", controller, name)
+                print("Adding mem addr out constraint", controller, name)
                 addr_out_type = term.get_sort()
 
                 addr_out_lut = []
@@ -430,7 +447,7 @@ def mem_tile_constraint_generator(
                         solver.ops.Equal, term, addr_out_var(solver.cycle_count)
                     )
                 )
-                break
+                # break
 
 
 def mem_tile_get_num_valids(config, cycles, iterator_support=2, address_width=16):
