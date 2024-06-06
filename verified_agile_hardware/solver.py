@@ -19,6 +19,7 @@ class Solver:
         self.bboxes = {}
         self.file_info = {}
         self.app_dir = ""
+        self.verbose = False
         self.rsts = []
         self.clks = []
         self.flushes = []

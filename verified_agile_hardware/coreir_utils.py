@@ -1,4 +1,5 @@
 import os
+import sys
 import coreir
 import networkx as nx
 import json
@@ -197,6 +198,8 @@ def node_to_smt(
         metadata = data["inst"].metadata
         # Need to configure memory here
         mem_tile = solver.interconnect.tile_circuits[(3, 1)].core
+
+        sys.stdout = open(os.devnull, "w")
         config = mem_tile.get_config_bitstream(data["inst"].metadata)
 
         strg_ub_vec = None
@@ -216,6 +219,7 @@ def node_to_smt(
         lake_configs = strg_ub_vec.get_bitstream(metadata["config"])
         if "stencil_valid" in metadata["config"]:
             lake_configs += stencil_valid.get_bitstream(metadata["config"])
+        sys.stdout = sys.__stdout__
 
         mode = "UB"
         if "stencil_valid" in metadata["config"]:
@@ -633,7 +637,6 @@ def pack_pe_constants(graph):
 
 def nx_to_smt(graph, interconnect, solver):
     pack_pe_constants(graph)
-
 
     solver.interconnect = interconnect
 

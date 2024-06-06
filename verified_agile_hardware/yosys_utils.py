@@ -17,7 +17,7 @@ def run_yosys_script(script, yosys_path="yosys"):
 
     cmd = [yosys_path, "-ql", "/dev/stdout", "-s", "/dev/stdin"]
 
-    print("Running Yosys script...")
+    # print("Running Yosys script...")
     p = subprocess.Popen(
         cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
@@ -31,7 +31,7 @@ def run_yosys_script(script, yosys_path="yosys"):
 
     # print(stdout.decode("utf-8"))
 
-    print("Finished running Yosys script.")
+    # print("Finished running Yosys script.")
 
 
 def sv2v(sv_filename, v_filename, sv2v_path="sv2v"):
@@ -48,13 +48,13 @@ def sv2v(sv_filename, v_filename, sv2v_path="sv2v"):
 
     cmd = [sv2v_path, sv_filename]
 
-    print("Running sv2v on " + sv_filename + "...")
+    # print("Running sv2v on " + sv_filename + "...")
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
 
     # create filename in directory of this file
-    print("Done running sv2v on " + sv_filename + ".")
-    print("Writing output to " + v_filename + "...")
+    # print("Done running sv2v on " + sv_filename + ".")
+    # print("Writing output to " + v_filename + "...")
     with open(v_filename, "w") as f:
         f.write(stdout.decode("utf-8"))
 
@@ -126,7 +126,7 @@ write_verilog {btor_filename}.v
 write_btor {btor_filename}            
     """
     run_yosys_script(script)
-    print(f"Finished writing BTOR2 file to {btor_filename}")
+    # print(f"Finished writing BTOR2 file to {btor_filename}")
 
 
 def garnet_to_btor(
@@ -172,9 +172,9 @@ write_verilog {btor_filename}.v
 write_btor {btor_filename}            
 """
 
-    print(script)
+    # print(script)
     run_yosys_script(script)
-    print(f"Finished writing BTOR2 file to {btor_filename}")
+    # print(f"Finished writing BTOR2 file to {btor_filename}")
 
 
 def flatten_garnet(
@@ -230,6 +230,6 @@ clean -purge;
 write_verilog {garnet_flattened}
     """
     run_yosys_script(script)
-    print(f"Finished writing flattened verilog file to {garnet_flattened}")
+    # print(f"Finished writing flattened verilog file to {garnet_flattened}")
 
     return interconnect_def

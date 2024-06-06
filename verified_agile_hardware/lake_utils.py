@@ -410,8 +410,9 @@ def mem_tile_constraint_generator(
         if len(y_hex) == 1:
             y_hex = "0" + y_hex
 
-        garnet_mem_name = f"Tile_X{x_hex}_Y{y_hex}.MemCore_inst0.MemCore_inner_W_inst0.MemCore_inner"
-
+        garnet_mem_name = (
+            f"Tile_X{x_hex}_Y{y_hex}.MemCore_inst0.MemCore_inner_W_inst0.MemCore_inner"
+        )
 
     for controller, addr_out_list in addr_out.items():
         for name, term in solver.fts.named_terms.items():
@@ -421,7 +422,7 @@ def mem_tile_constraint_generator(
                 and not solver.fts.is_next_var(term)
             ):
 
-                print("Adding mem addr out constraint", controller, name)
+                # print("Adding mem addr out constraint", controller, name)
                 addr_out_type = term.get_sort()
 
                 addr_out_lut = []

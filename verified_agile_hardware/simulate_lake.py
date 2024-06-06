@@ -20,9 +20,7 @@ class AddresssGeneratorModel:
 
     def set_config(self, new_config):
         for key, config_val in new_config.items():
-            if key not in self.config:
-                print("Gave bad config", key)
-            else:
+            if key in self.config:
                 self.config[key] = config_val
 
         self.address = self.config["starting_addr"]
@@ -62,9 +60,7 @@ class SchedGenModel:
 
     def set_config(self, new_config):
         for key, config_val in new_config.items():
-            if key not in self.config:
-                print("Gave bad config", key)
-            else:
+            if key in self.config:
                 self.config[key] = config_val
         for i in range(self.iterator_support):
             self.dim_cnt[i] = 0
@@ -456,7 +452,7 @@ endmodule
         f"{tile_name}_simulation_tb",
     ]
 
-    print("Running command", cmd)
+    # print("Running command", cmd)
     sim_res = subprocess.run(cmd, capture_output=True, text=True)
     # check for errors
     if sim_res.returncode != 0:
@@ -466,7 +462,7 @@ endmodule
 
     # Run the simulation
     cmd = [f"{app_dir}/{vtile_name}_simulation_tb"]
-    print("Running command", cmd)
+    # print("Running command", cmd)
     sim_res = subprocess.run(cmd, capture_output=True, text=True)
 
     # check for errors
