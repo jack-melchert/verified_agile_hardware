@@ -278,6 +278,8 @@ def node_to_smt(
             rom_wen_port = port_remap["ROM"]["wen"]
             used_inputs.append(rom_wen_port)
 
+        config_dict_save = config_dict.copy()
+
         mem_inputs, mem_outputs = load_new_mem_tile(
             solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
         )
@@ -291,19 +293,30 @@ def node_to_smt(
                     data["y"] - 1
                 ) // solver.interconnect.pipeline_config_interval
 
-        mem_tile_constraint_generator(
-            solver,
-            mem_name,
-            flush_offset=flush_offset,
-        )
 
         used_mem_inputs = []
+        for n,v in config_dict_save.items():
+  
+            mem_input = mem_inputs[n + "_" + mem_name]
+
+            solver.fts.add_invar(
+                solver.create_term(
+                    solver.ops.Equal, mem_input, solver.create_const(v, mem_input.get_sort())
+                )
+            )
+            used_mem_inputs.append(mem_input)
 
         # clock, and flush
         solver.clks.append(mem_inputs[f"clk_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"clk_{mem_name}"])
         solver.flushes.append(mem_inputs[f"flush_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"flush_{mem_name}"])
+
+        mem_tile_constraint_generator(
+            solver,
+            mem_name,
+            flush_offset=flush_offset,
+        )
 
         for in_symbol_name, in_symbol in in_symbols.items():
             port = in_symbol_name.split(f"{mem_name}.")[1]

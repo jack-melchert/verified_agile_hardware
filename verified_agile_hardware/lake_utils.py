@@ -103,6 +103,9 @@ def produce_configed_memtile_verilog(
     app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs
 ):
 
+    for n,v in config_dict.items():
+        used_inputs.append(n)
+
     # always used
     used_inputs += ["clk", "flush", "rst_n"]
 
@@ -122,16 +125,16 @@ def produce_configed_memtile_verilog(
             outputs_and_bw.append((name, bw, packed, size))
 
     # Setting all unused inputs to 0 for some reason causes the memtiles to misbehave
-    for in_, bw, packed, size in inputs_and_bw:
-        if in_ in config_dict or in_ in used_inputs:
-            continue
-        config_dict[in_] = 0
+    # for in_, bw, packed, size in inputs_and_bw:
+    #     if in_ in config_dict or in_ in used_inputs:
+    #         continue
+    #     config_dict[in_] = 0
 
     # Module definition
     verilog = f"""module {mem_name} (\n"""
 
     for in_, bw, packed, size in inputs_and_bw:
-        if in_ in config_dict or in_ not in used_inputs:
+        if in_ not in used_inputs:
             continue
         in_ += f"_{mem_name}"
         if packed:
@@ -152,7 +155,7 @@ def produce_configed_memtile_verilog(
 
     # Wire instantiation
     for in_, bw, packed, size in inputs_and_bw:
-        if in_ in config_dict or in_ in used_inputs:
+        if in_ in used_inputs:
             continue
         in_ += f"_{mem_name}"
         if packed:
@@ -173,10 +176,7 @@ def produce_configed_memtile_verilog(
     verilog += f"{mem_tile.dut.name} {mem_tile.dut.name}_{mem_name} (\n"
 
     for in_, bw, packed, size in inputs_and_bw:
-        if in_ in config_dict:
-            verilog += f".{in_}({bw}'d{config_dict[in_]}),\n"
-        else:
-            verilog += f".{in_}({in_}_{mem_name}),\n"
+        verilog += f".{in_}({in_}_{mem_name}),\n"
 
     for in_, bw, packed, size in outputs_and_bw:
         verilog += f".{in_}({in_}_{mem_name}),\n"
@@ -284,6 +284,7 @@ def produce_configed_simulation_memtile_verilog(
 def load_new_mem_tile(
     solver, mem_name, mem_tile, config_dict, used_inputs, used_outputs
 ):
+
     # Write kratos config_dict to configure mem tile
     produce_configed_memtile_verilog(
         solver.app_dir, mem_tile, config_dict, mem_name, used_inputs, used_outputs
