@@ -263,7 +263,7 @@ def node_to_smt(
         config_dict["config_write"] = 0
 
         # config_dict["flush"] = 0
-        config_dict["rst_n"] = 1
+        # config_dict["rst_n"] = 1
 
         used_inputs = [
             port_remap_mem(mode, in_symbol_name.split(f"{mem_name}.")[1], port_remap)
@@ -291,11 +291,11 @@ def node_to_smt(
                     data["y"] - 1
                 ) // solver.interconnect.pipeline_config_interval
 
-        mem_tile_constraint_generator(
-            solver,
-            mem_name,
-            flush_offset=flush_offset,
-        )
+        # mem_tile_constraint_generator(
+        #     solver,
+        #     mem_name,
+        #     flush_offset=flush_offset,
+        # )
 
         used_mem_inputs = []
 
@@ -304,6 +304,8 @@ def node_to_smt(
         used_mem_inputs.append(mem_inputs[f"clk_{mem_name}"])
         solver.flushes.append(mem_inputs[f"flush_{mem_name}"])
         used_mem_inputs.append(mem_inputs[f"flush_{mem_name}"])
+        solver.rsts.append(mem_inputs[f"rst_n_{mem_name}"])
+        used_mem_inputs.append(mem_inputs[f"rst_n_{mem_name}"])
 
         for in_symbol_name, in_symbol in in_symbols.items():
             port = in_symbol_name.split(f"{mem_name}.")[1]
