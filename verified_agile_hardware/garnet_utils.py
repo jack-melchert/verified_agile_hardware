@@ -39,7 +39,7 @@ def get_garnet_btor_outputs(solver, btor_filename):
 
 
 def config_garnet(
-    interconnect, bitstream, garnet_filename, configed_garnet_filename, interconnect_def
+    interconnect, bitstream, garnet_filename, configed_garnet_filename, interconnect_def, placement, id_to_name
 ):
 
     bitstream_dict = {b[0]: b[1] for b in bitstream}
@@ -84,7 +84,70 @@ def config_garnet(
         if addr not in used_bitstreams:
             print(f"Unused bitstream: {addr}")
 
+    IOs = []
+
+    for id, loc in placement.items():
+        if "I" in id:
+            name = id_to_name[id]
+
+            if "io16in" in name:
+                prefix = "glb2io_16"
+            else:
+                prefix = "io2glb_16"
+            
+        elif "i" in id:
+            name = id_to_name[id]
+
+            if "io16in" in name:
+                prefix = "glb2io_1"
+            else:
+                prefix = "io2glb_1"
+
+        x = loc[0]
+        y = loc[1]
+        x_hex = hex(x)[2:]
+        y_hex = hex(y)[2:]
+
+        if len(x_hex) == 1:
+            x_hex = "0" + x_hex
+
+        if len(y_hex) == 1:
+            y_hex = "0" + y_hex
+
+        IOs.append(
+            f"{prefix}_X{x_hex}_Y{y_hex}"
+        )
+
+    interconnect_def_new = interconnect_def.split()[0:3]
+
+    discarded_inputs = []
+
+    
+
+    for line in interconnect_def.split()[3:-1]:
+        used_input = False
+
+        for IO in IOs:
+            if IO in line:
+                used_input = True
+        for l in ['clk', 'flush', 'reset', 'stall']:
+            if l in line:
+                used_input = True
+
+
+        if used_input:
+            interconnect_def_new.append(line)
+        else:
+            discarded_inputs.append(line.replace(",", "") + ";")
+
+
+    interconnect_def_new.append(interconnect_def.split()[-1])
+
+    interconnect_def_new = "\n".join(interconnect_def_new)
+
     # Read in garnet file and write out to configed_garnet_filename
+
+
 
     with open(garnet_filename, "r") as f:
         garnet_lines = f.readlines()
@@ -92,6 +155,7 @@ def config_garnet(
     f = open(configed_garnet_filename, "w")
 
     reading_inputs = False
+    reading_unused_inputs = False
     found_interconnect_def = False
 
     for line in garnet_lines:
@@ -101,7 +165,7 @@ def config_garnet(
 
         if found_interconnect_def and ");" in line:
             found_interconnect_def = False
-            f.write(interconnect_def)
+            f.write(interconnect_def_new)
             continue
 
         if found_interconnect_def:
@@ -113,6 +177,8 @@ def config_garnet(
                 f"  assign {signal} = {config[signal]['width']}'d{config[signal]['value']};\n"
             )
             reading_inputs = False
+        elif reading_unused_inputs:
+            reading_unused_inputs = False
         else:
 
             ls = line.split()
@@ -127,7 +193,22 @@ def config_garnet(
                 if signal in config:
                     reading_inputs = True
 
-            if not reading_inputs:
+                if signal in discarded_inputs:
+                    reading_unused_inputs = True
+
+            ls = line.split()
+            if len(ls) > 1 and ls[0] == "output":
+                if ls[1][0] == "\\":
+                    signal = ls[1]
+                elif len(ls) > 2 and ls[2][0] == "\\":
+                    signal = ls[2]
+                else:
+                    signal = ls[-1]
+
+                if signal in discarded_inputs:
+                    reading_unused_inputs = True
+
+            if not (reading_inputs or reading_unused_inputs):
                 f.write(line)
 
     f.close()

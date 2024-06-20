@@ -393,8 +393,6 @@ def mem_tile_constraint_generator(
         symbols_to_collect,
     )
 
-    for controller, addr_out_list in addr_out.items():
-        addr_out[controller] = [0] * flush_offset + addr_out_list
 
     garnet_mem_name = mem_name
     if hasattr(solver, "placement") and mem_name in solver.placement:

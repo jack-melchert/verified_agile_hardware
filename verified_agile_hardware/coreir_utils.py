@@ -75,8 +75,12 @@ def node_to_smt(
             for out_symbol_name in out_symbols_names:
                 out_symbols[out_symbol_name] = in_symbol
 
+
+
     elif tile_type == "global.PE":
         # To use bitwuzla, we can try packing the PE instuction into this node, and calling the PE smt with the constant
+
+    
 
         out_port_names = [
             str(out_symbol).split(f"{node}.")[1] for out_symbol in out_symbols_names
@@ -290,6 +294,7 @@ def node_to_smt(
                 flush_offset = (
                     data["y"] - 1
                 ) // solver.interconnect.pipeline_config_interval
+
 
         mem_tile_constraint_generator(
             solver,
