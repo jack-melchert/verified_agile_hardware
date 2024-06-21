@@ -365,13 +365,14 @@ def node_to_smt(
             k: v for k, v in mem_inputs.items() if v not in used_mem_inputs
         }
 
+
         for k, v in unused_mem_inputs.items():
-            if "config" in k:
-                solver.fts.add_invar(
-                    solver.create_term(
-                        solver.ops.Equal, v, solver.create_const(0, v.get_sort())
-                    )
+            # if "config" in k:
+            solver.fts.add_invar(
+                solver.create_term(
+                    solver.ops.Equal, v, solver.create_const(0, v.get_sort())
                 )
+            )
 
         for out_symbol_name in out_symbols_names:
             port = out_symbol_name.split(f"{mem_name}.")[1]

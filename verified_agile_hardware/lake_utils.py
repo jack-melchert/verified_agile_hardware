@@ -134,8 +134,8 @@ def produce_configed_memtile_verilog(
     verilog = f"""module {mem_name} (\n"""
 
     for in_, bw, packed, size in inputs_and_bw:
-        if in_ not in used_inputs:
-            continue
+        # if in_ not in used_inputs:
+        #     continue
         in_ += f"_{mem_name}"
         if packed:
             verilog += f"input wire [{size-1}:0] [{bw-1}:0] {in_},\n"
@@ -143,8 +143,8 @@ def produce_configed_memtile_verilog(
             verilog += f"input wire [{bw-1}:0] {in_},\n"
 
     for out_, bw, packed, size in outputs_and_bw:
-        if out_ not in used_outputs:
-            continue
+        # if out_ not in used_outputs:
+        #     continue
         out_ += f"_{mem_name}"
         if packed:
             verilog += f"output wire [{size-1}:0] [{bw-1}:0] {out_},\n"
@@ -155,8 +155,8 @@ def produce_configed_memtile_verilog(
 
     # Wire instantiation
     for in_, bw, packed, size in inputs_and_bw:
-        if in_ in used_inputs:
-            continue
+        # if in_ in used_inputs:
+        continue
         in_ += f"_{mem_name}"
         if packed:
             verilog += f"wire [{size-1}:0] [{bw-1}:0] {in_};\n"
@@ -164,8 +164,8 @@ def produce_configed_memtile_verilog(
             verilog += f"wire [{bw-1}:0] {in_};\n"
 
     for out_, bw, packed, size in outputs_and_bw:
-        if out_ in used_outputs:
-            continue
+        # if out_ in used_outputs:
+        continue
         out_ += f"_{mem_name}"
         if packed:
             verilog += f"wire [{size-1}:0] [{bw-1}:0] {out_};\n"
